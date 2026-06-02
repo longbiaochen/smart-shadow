@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>me.longbiaochen.smart-shadow</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT_ROOT__/.build/debug/smart-shadow-mac-core</string>
+    <string>--config</string>
+    <string>__PROJECT_ROOT__/config/smart-shadow.json</string>
+    <string>daemon</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_ROOT__</string>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>WatchPaths</key>
+  <array>
+    <string>__PROJECT_ROOT__/var/inbox/events</string>
+  </array>
+  <key>StandardOutPath</key>
+  <string>__PROJECT_ROOT__/var/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_ROOT__/var/logs/launchd.err.log</string>
+</dict>
+</plist>

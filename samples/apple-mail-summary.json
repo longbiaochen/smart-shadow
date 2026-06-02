@@ -1,0 +1,10 @@
+[
+  {
+    "source_id": "mail-demo-editorial-001",
+    "sender": "em@editorialmanager.com",
+    "subject": "New Manuscript submitted for your Editor Assignment",
+    "summary": "A new manuscript requires editorial review. Please decide whether to invite reviewers by Friday.",
+    "mailbox": "INBOX",
+    "received_at": "2026-06-02T08:30:00Z"
+  }
+]

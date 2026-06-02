@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "domain_rules": {
+    "health": ["健康", "睡眠", "运动", "饮食", "体检", "医生", "医院", "焦虑", "心理", "健身"],
+    "money": ["钱", "回款", "收入", "付款", "发票", "报销", "工资", "投资", "理财", "合同", "客户", "项目款", "成本", "预算"],
+    "relationship": ["家人", "父母", "老婆", "爱人", "朋友", "同学", "感谢", "拜访", "礼物", "关系", "沟通", "约饭"],
+    "work": ["工作", "项目", "会议", "交付", "开发", "代码", "github", "飞书", "文档", "汇报", "评审", "部署"]
+  },
+  "source_default_domains": {
+    "apple_mail_summary": "work",
+    "apple_mail_app": "work",
+    "apple_reminders_inbox": "work",
+    "chrome_bookmarks": "work",
+    "lark_daily_context": "work"
+  },
+  "rules": [
+    {
+      "rule_id": "safety.high_risk_boundary",
+      "scope": "global",
+      "triggers": ["支付", "转账", "投资", "借贷", "合同", "承诺", "发送", "回复", "公开", "发布", "删除", "隐私", "账号", "密码", "医疗", "法律"],
+      "domain": null,
+      "priority": "high",
+      "risk": "high",
+      "needs_review": true,
+      "action": "create_review_reminder",
+      "confidence": "high",
+      "rationale": "命中高风险边界，需要用户审核后才能对外或不可逆执行。"
+    },
+    {
+      "rule_id": "value.mail_editorial_work",
+      "scope": "source",
+      "sources": ["apple_mail_summary", "apple_mail_app"],
+      "triggers": ["editor assignment", "reviewer agrees", "required reviews complete", "made a decision", "manuscript submitted", "new manuscript"],
+      "domain": "work",
+      "priority": "high",
+      "risk": "medium",
+      "needs_review": true,
+      "action": "create_review_reminder",
+      "confidence": "medium",
+      "rationale": "命中邮件来源的审稿、编辑或投稿工作事项，需要进入用户可见看板。"
+    },
+    {
+      "rule_id": "value.source_specific",
+      "scope": "source",
+      "sources": ["apple_mail_summary", "apple_mail_app", "chrome_bookmarks", "lark_daily_context", "apple_reminders_inbox"],
+      "triggers": ["合同", "付款", "发票", "客户", "deadline", "due", "blocked", "阻塞", "会议", "待办", "交付", "评审", "project", "github", "paper", "论文", "项目", "副业", "赚钱"],
+      "domain": null,
+      "priority": "high",
+      "risk": "medium",
+      "needs_review": true,
+      "action": "create_review_reminder",
+      "confidence": "medium",
+      "rationale": "命中来源特化高价值信号，需要进入用户可见看板。"
+    },
+    {
+      "rule_id": "value.life_mainline",
+      "scope": "global",
+      "triggers": ["回款", "收入", "健康", "睡眠", "客户", "交付", "阻塞", "家人", "关系", "审核", "授权", "确认"],
+      "domain": null,
+      "priority": "high",
+      "risk": "medium",
+      "needs_review": true,
+      "action": "create_review_reminder",
+      "confidence": "medium",
+      "rationale": "命中人生主线高价值信号，需要进入用户可见看板。"
+    },
+    {
+      "rule_id": "noise.low_value",
+      "scope": "global",
+      "triggers": ["广告", "促销", "优惠券", "订阅", "newsletter", "低价值"],
+      "domain": null,
+      "priority": "low",
+      "risk": "low",
+      "needs_review": false,
+      "action": "archive_low_value",
+      "confidence": "medium",
+      "rationale": "低价值噪音，默认只审计不打扰。"
+    },
+    {
+      "rule_id": "background.apple_reminders_inbox",
+      "scope": "source",
+      "sources": ["apple_reminders_inbox"],
+      "triggers": [],
+      "domain": "work",
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "record_only",
+      "confidence": "medium",
+      "rationale": "Apple Reminders Inbox 通过 EventKit 只读感知，默认作为工作面板背景，不重复制造提醒。"
+    },
+    {
+      "rule_id": "background.apple_mail_summary",
+      "scope": "source",
+      "sources": ["apple_mail_summary", "apple_mail_app"],
+      "triggers": [],
+      "domain": "work",
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "record_only",
+      "confidence": "medium",
+      "rationale": "普通邮件默认不打扰；高价值或高风险邮件按规则进入起草、审核、发送、归档或跟进动作流。"
+    },
+    {
+      "rule_id": "background.chrome_bookmarks",
+      "scope": "source",
+      "sources": ["chrome_bookmarks"],
+      "triggers": [],
+      "domain": "work",
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "record_only",
+      "confidence": "medium",
+      "rationale": "书签元数据只读入库，默认作为内容队列背景。"
+    },
+    {
+      "rule_id": "background.lark_daily_context",
+      "scope": "source",
+      "sources": ["lark_daily_context"],
+      "triggers": [],
+      "domain": "work",
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "record_only",
+      "confidence": "medium",
+      "rationale": "飞书日上下文只读入库，用于日程和待办背景。"
+    }
+  ]
+}

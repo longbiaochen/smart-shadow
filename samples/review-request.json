@@ -1,0 +1,12 @@
+{
+  "source": "manual_acceptance",
+  "source_id": "acceptance-001",
+  "title": "跟进一个可能带来项目回款的客户沟通",
+  "body": "需要准备简洁审核材料：背景、建议、影响、替代方案和默认推荐。不要自动发送对外消息。",
+  "kind": "message_draft",
+  "occurred_at": "2026-06-01T10:00:00+08:00",
+  "metadata": {
+    "expected_domain": "money",
+    "acceptance_case": true
+  }
+}

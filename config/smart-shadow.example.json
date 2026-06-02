@@ -1,0 +1,112 @@
+{
+  "runtime_root": "var",
+  "rules_file": "config/rules.json",
+  "poll_seconds": 10,
+  "sources": {
+    "event_inbox": "inbox/events",
+    "file_metadata": {
+      "enabled": false,
+      "paths": [
+        "~/Downloads",
+        "~/Desktop"
+      ],
+      "max_age_hours": 24,
+      "max_items": 25,
+      "ignore_names": [
+        ".DS_Store"
+      ]
+    },
+    "lark_daily_context": {
+      "enabled": false,
+      "commands": [
+        {
+          "label": "calendar_agenda",
+          "argv": [
+            "lark-cli",
+            "calendar",
+            "+agenda"
+          ]
+        },
+        {
+          "label": "my_tasks",
+          "argv": [
+            "lark-cli",
+            "task",
+            "+get-my-tasks"
+          ]
+        }
+      ],
+      "timeout_seconds": 20,
+      "max_items_per_command": 20,
+      "max_body_chars": 4000
+    },
+    "chrome_bookmarks": {
+      "enabled": false,
+      "bookmarks_file": "~/Library/Application Support/Google/Chrome/Default/Bookmarks",
+      "max_age_days": 30,
+      "max_items": 25,
+      "ignored_schemes": [
+        "chrome",
+        "javascript",
+        "file"
+      ]
+    },
+    "apple_reminders_inbox": {
+      "enabled": false,
+      "backend": "eventkit",
+      "list": "Inbox",
+      "max_items": 10
+    },
+    "apple_mail_summary": {
+      "enabled": false,
+      "backend": "local_summary_json",
+      "messages_file": "samples/apple-mail-summary.json",
+      "include_mailboxes": [
+        "INBOX"
+      ],
+      "unread_only": true,
+      "max_age_hours": 24,
+      "max_items": 20
+    },
+    "apple_mail_app": {
+      "enabled": false,
+      "backend": "mail_app_script",
+      "reader_argv": [
+        "osascript",
+        "-e",
+        "return \"[]\""
+      ],
+      "max_items": 20,
+      "max_body_chars": 4000,
+      "timeout_seconds": 20
+    }
+  },
+  "reminders": {
+    "enabled": true,
+    "domain_lists": {
+      "money": "MONEY",
+      "health": "HEALTH",
+      "relationship": "NETWORK",
+      "work": "WORK"
+    }
+  },
+  "actions": {
+    "auto_create_review_reminders": true,
+    "auto_archive_low_value": true
+  },
+  "review": {
+    "approval_keywords": [
+      "批准",
+      "同意",
+      "approve",
+      "approved"
+    ]
+  },
+  "execution": {
+    "auto_process_approved": false,
+    "allowed_approved_actions": [
+      "write_local_draft"
+    ],
+    "drafts_dir": "var/drafts"
+  }
+}

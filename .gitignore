@@ -1,0 +1,17 @@
+.build/
+.swiftpm/
+.codex/
+dist/
+var/
+config/smart-shadow.json
+!config/smart-shadow.example.json
+config/*.bak-*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.DS_Store
