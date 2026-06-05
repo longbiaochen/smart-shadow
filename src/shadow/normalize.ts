@@ -18,7 +18,7 @@ function getPath(source: unknown, path: string[]): unknown {
 
 export function normalizeFeishuEvent(raw: unknown, eventKey: string): ShadowMessage {
   const event = getPath(raw, ["event"]) ?? raw;
-  const message = getPath(event, ["message"]) ?? {};
+  const message = getPath(event, ["message"]) ?? event;
   const sender = getPath(event, ["sender"]) ?? {};
   const senderId = getPath(sender, ["sender_id"]) ?? {};
   const messageType = pickString(getPath(message, ["message_type"]), getPath(message, ["type"])) ?? "unknown";
@@ -36,6 +36,7 @@ export function normalizeFeishuEvent(raw: unknown, eventKey: string): ShadowMess
         getPath(senderId, ["user_id"]),
         getPath(senderId, ["open_id"]),
         getPath(senderId, ["union_id"]),
+        getPath(event, ["sender_id"]),
         getPath(sender, ["user_id"]),
         getPath(sender, ["id"])
       ) ?? "unknown",

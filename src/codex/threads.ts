@@ -3,8 +3,23 @@ import type { Registry } from "../shadow/registry.js";
 import type { CandidateThread } from "../shadow/types.js";
 import type { CodexAppServerClient, JsonRpcNotification } from "./appserver.js";
 
+export function isValidCodexThreadId(value: string): boolean {
+  return /^(urn:uuid:)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
+}
+
+function extractThreadId(result: unknown): string {
+  const record = result as Record<string, unknown>;
+  const thread = record.thread as Record<string, unknown> | undefined;
+  const threadId = String(record.threadId ?? record.id ?? thread?.threadId ?? thread?.id ?? "");
+  if (!isValidCodexThreadId(threadId)) {
+    throw new Error(`invalid thread id from Codex AppServer response: ${threadId || "<missing>"}`);
+  }
+  return threadId;
+}
+
 export class CodexThreads {
   private completed = new Map<string, { finalText: string; raw: unknown }>();
+  private agentMessageTextByThread = new Map<string, string>();
 
   constructor(private readonly client: CodexAppServerClient, private readonly config: Config) {
     this.client.onNotification((msg) => this.handleNotification(msg));
@@ -27,7 +42,14 @@ export class CodexThreads {
 
   async ensureMainThread(registry: Registry): Promise<string> {
     const existing = registry.getMainThread();
-    if (existing) return existing.threadId;
+    if (existing && isValidCodexThreadId(existing.threadId)) {
+      try {
+        await this.resumeThread({ threadId: existing.threadId, cwd: existing.cwd || this.config.codex.defaultCwd });
+        return existing.threadId;
+      } catch {
+        // Stale local registry entries are expected after app-server/session cleanup.
+      }
+    }
     const threadId = await this.startThread({ cwd: this.config.codex.defaultCwd, title: this.config.codex.dispatcherThreadTitle });
     registry.setMainThread({ threadId, cwd: this.config.codex.defaultCwd, title: this.config.codex.dispatcherThreadTitle });
     await registry.save();
@@ -36,8 +58,7 @@ export class CodexThreads {
 
   async startThread(input: { cwd: string; title?: string }): Promise<string> {
     const result = await this.client.request<unknown>("thread/start", input);
-    const record = result as Record<string, unknown>;
-    return String(record.threadId ?? record.id);
+    return extractThreadId(result);
   }
 
   async resumeThread(input: { threadId: string; cwd?: string }): Promise<void> {
@@ -81,11 +102,20 @@ export class CodexThreads {
   }
 
   private handleNotification(msg: JsonRpcNotification): void {
-    if (!/turn.*(complete|completed|finish|finished)/i.test(msg.method)) return;
     const params = (msg.params ?? {}) as Record<string, unknown>;
+    if (msg.method === "item/agentMessage/delta") {
+      const threadId = String(params.threadId ?? params.thread_id ?? "");
+      const delta = typeof params.delta === "string" ? params.delta : "";
+      if (threadId && delta) {
+        this.agentMessageTextByThread.set(threadId, `${this.agentMessageTextByThread.get(threadId) ?? ""}${delta}`);
+      }
+      return;
+    }
+    if (!/turn.*(complete|completed|finish|finished)/i.test(msg.method)) return;
     const threadId = String(params.threadId ?? params.thread_id ?? "");
     if (!threadId) return;
-    const finalText = String(params.finalText ?? params.text ?? params.message ?? params.output ?? "");
+    const finalText = String(params.finalText ?? params.text ?? params.message ?? params.output ?? this.agentMessageTextByThread.get(threadId) ?? "");
+    this.agentMessageTextByThread.delete(threadId);
     this.completed.set(threadId, { finalText, raw: msg });
   }
 }

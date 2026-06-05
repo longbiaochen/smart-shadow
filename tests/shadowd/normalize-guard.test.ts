@@ -37,6 +37,29 @@ test("normalizes a Feishu text event into a ShadowMessage without routing busine
   assert.deepEqual(msg.raw, raw);
 });
 
+test("normalizes lark-cli flattened message events", () => {
+  const raw = {
+    type: "im.message.receive_v1",
+    event_id: "event-flat-1",
+    message_id: "om-flat-1",
+    chat_id: "oc-flat-1",
+    chat_type: "p2p",
+    sender_id: "ou-flat-sender",
+    message_type: "text",
+    content: "Smart Shadow current-app 链路测试"
+  };
+
+  const msg = normalizeFeishuEvent(raw, "im.message.receive_v1");
+
+  assert.equal(msg.id, "event-flat-1");
+  assert.equal(msg.sender.id, "ou-flat-sender");
+  assert.equal(msg.chat.id, "oc-flat-1");
+  assert.equal(msg.chat.type, "p2p");
+  assert.equal(msg.message.id, "om-flat-1");
+  assert.equal(msg.message.type, "text");
+  assert.equal(msg.message.text, "Smart Shadow current-app 链路测试");
+});
+
 test("guard enforces allow lists and message de-duplication", async () => {
   const msg = normalizeFeishuEvent({
     event: {

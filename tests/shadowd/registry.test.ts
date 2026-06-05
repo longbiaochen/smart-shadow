@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { Registry } from "../../src/shadow/registry.js";
+import { isValidCodexThreadId } from "../../src/codex/threads.js";
 
 test("registry creates default file and persists projects bindings and processed messages", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "smart-shadow-registry-"));
@@ -39,4 +40,11 @@ test("registry creates default file and persists projects bindings and processed
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("codex thread id validation rejects undefined registry poison", () => {
+  assert.equal(isValidCodexThreadId("undefined"), false);
+  assert.equal(isValidCodexThreadId(""), false);
+  assert.equal(isValidCodexThreadId("550e8400-e29b-41d4-a716-446655440000"), true);
+  assert.equal(isValidCodexThreadId("urn:uuid:550e8400-e29b-41d4-a716-446655440000"), true);
 });
