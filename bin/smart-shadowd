@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+LABEL="me.longbiaochen.smart-shadowd"
+DOMAIN="gui/$(id -u)"
+PLIST_DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
+TEMPLATE="$ROOT_DIR/launchd/$LABEL.plist.template"
+
+usage() {
+  cat <<EOF
+Usage: bin/smart-shadowd <command>
+
+Commands:
+  render-plist [--stdout]  Render the LaunchAgent plist
+  install                  Install and bootstrap the user LaunchAgent
+  uninstall                Boot out and remove the user LaunchAgent
+  start                    Start the LaunchAgent
+  stop                     Stop the LaunchAgent
+  restart                  Restart the LaunchAgent
+  status                   Show launchctl status and recent logs
+  logs                     Tail smart-shadowd logs
+EOF
+}
+
+render_plist() {
+  sed "s#__PROJECT_ROOT__#$ROOT_DIR#g" "$TEMPLATE"
+}
+
+install_agent() {
+  mkdir -p "$HOME/Library/LaunchAgents" "$ROOT_DIR/var/logs" "$ROOT_DIR/.smart-shadow"
+  render_plist > "$PLIST_DEST"
+  plutil -lint "$PLIST_DEST" >/dev/null
+  launchctl bootout "$DOMAIN" "$PLIST_DEST" >/dev/null 2>&1 || true
+  launchctl unsetenv GITHUB_PAT_TOKEN >/dev/null 2>&1 || true
+  env -u GITHUB_PAT_TOKEN launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
+  launchctl enable "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
+  launchctl kickstart -k "$DOMAIN/$LABEL"
+  echo "installed $LABEL"
+  echo "$PLIST_DEST"
+}
+
+uninstall_agent() {
+  launchctl bootout "$DOMAIN" "$PLIST_DEST" >/dev/null 2>&1 || true
+  rm -f "$PLIST_DEST"
+  echo "uninstalled $LABEL"
+}
+
+status_agent() {
+  echo "label: $LABEL"
+  echo "plist: $PLIST_DEST"
+  local printed
+  printed="$(launchctl print "$DOMAIN/$LABEL" 2>/dev/null)" || {
+    echo "not loaded"
+    return 1
+  }
+  printf '%s\n' "$printed" | awk '
+    /^[[:space:]]*state =/ ||
+    /^[[:space:]]*program =/ ||
+    /^[[:space:]]*working directory =/ ||
+    /^[[:space:]]*stdout path =/ ||
+    /^[[:space:]]*stderr path =/ ||
+    /^[[:space:]]*runs =/ ||
+    /^[[:space:]]*pid =/ ||
+    /^[[:space:]]*last exit code =/ ||
+    /^[[:space:]]*last terminating signal =/ {
+      print
+    }
+  '
+  echo
+  echo "stdout: $ROOT_DIR/var/logs/smart-shadowd.out.log"
+  tail -n 20 "$ROOT_DIR/var/logs/smart-shadowd.out.log" 2>/dev/null || true
+  echo
+  echo "stderr: $ROOT_DIR/var/logs/smart-shadowd.err.log"
+  tail -n 40 "$ROOT_DIR/var/logs/smart-shadowd.err.log" 2>/dev/null || true
+}
+
+case "${1:-}" in
+  render-plist)
+    if [[ "${2:-}" == "--stdout" || -z "${2:-}" ]]; then
+      render_plist
+    else
+      usage >&2
+      exit 2
+    fi
+    ;;
+  install)
+    install_agent
+    ;;
+  uninstall)
+    uninstall_agent
+    ;;
+  start)
+    launchctl kickstart -k "$DOMAIN/$LABEL"
+    ;;
+  stop)
+    launchctl kill TERM "$DOMAIN/$LABEL" 2>/dev/null || true
+    ;;
+  restart)
+    launchctl kill TERM "$DOMAIN/$LABEL" 2>/dev/null || true
+    sleep 1
+    launchctl kickstart -k "$DOMAIN/$LABEL"
+    ;;
+  status)
+    status_agent
+    ;;
+  logs)
+    mkdir -p "$ROOT_DIR/var/logs"
+    tail -n 80 -f "$ROOT_DIR/var/logs/smart-shadowd.out.log" "$ROOT_DIR/var/logs/smart-shadowd.err.log"
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
