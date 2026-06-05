@@ -126,6 +126,94 @@ Run it with:
 
 The script builds `smart-shadow-menu`, stages `dist/SmartShadowMenu.app`, and launches it as an `LSUIElement` menu-bar app without a Dock icon.
 
+## smart-shadowd Feishu Bridge MVP
+
+`smart-shadowd` is an optional thin TypeScript bridge for Feishu-to-Codex task routing. It does not replace the Swift-native macOS core and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
+
+```mermaid
+flowchart LR
+    Feishu["Feishu CLI event consume"] --> D["smart-shadowd"]
+    D --> AppServer["Codex AppServer stdio"]
+    AppServer --> Main["smart-shadow-main dispatcher thread"]
+    Main --> Work["target Codex working thread"]
+    Work --> D
+    D --> Reply["Feishu reply or dry-run output"]
+```
+
+Install Node dependencies:
+
+```sh
+pnpm install
+```
+
+Feishu CLI prerequisites:
+
+- `lark-cli` is installed and authenticated.
+- The bot or user identity can consume `im.message.receive_v1`.
+- For first local runs, keep `feishu.dryRunReply: true` in [config/smart-shadow.yaml](config/smart-shadow.yaml).
+
+Codex AppServer prerequisites:
+
+- `codex app-server --stdio` is available on `PATH`.
+- The bridge initializes it with `experimentalApi: true`.
+- The current AppServer method shapes should be verified against the local Codex version; a formal implementation should regenerate types from the Codex app-server schema instead of relying on the MVP wrapper.
+
+Configuration lives in [config/smart-shadow.yaml](config/smart-shadow.yaml). Override the path with:
+
+```sh
+SMART_SHADOW_CONFIG=/absolute/path/to/smart-shadow.yaml pnpm dev:shadowd
+```
+
+The registry defaults to `.smart-shadow/registry.json` and is created automatically. It stores the dispatcher thread id, known projects, Feishu-to-Codex thread bindings, and processed message ids.
+
+Run development mode with one event and a timeout:
+
+```sh
+pnpm dev:shadowd -- --max-events=1 --timeout=30s
+```
+
+Dry-run replies print the exact outgoing message instead of sending it:
+
+```sh
+[dry-run feishu reply] chat=oc_xxx thread=omt_xxx message=om_xxx
+...
+```
+
+Test dispatcher and local bridge logic:
+
+```sh
+pnpm test:shadowd
+pnpm typecheck:shadowd
+```
+
+Test Feishu event consume directly before full-loop testing:
+
+```sh
+lark-cli event consume im.message.receive_v1 --as bot
+```
+
+Full dry-run loop:
+
+1. Set `feishu.dryRunReply: true`.
+2. Run `pnpm dev:shadowd -- --max-events=1 --timeout=30s`.
+3. Send `Smart Shadow 测试：请回复你收到了。`.
+4. Confirm logs show normalization, dispatcher decision, and dry-run reply output.
+
+Current limitations:
+
+- Live Feishu sending is wrapped behind `FeishuReplier`, but the exact `lark-cli im send` command still needs confirmation with this Mac's current `lark-cli im --help`.
+- No SQLite, launchd installer, web UI, approval broker, multi-user administration, or complex stream reducer is included in this MVP.
+- Server-initiated AppServer requests are recognized and declined so they do not crash the bridge.
+- `turn/completed` notification shapes may drift with Codex versions; verify against local AppServer events before running unattended.
+
+Roadmap:
+
+- Generate AppServer TypeScript types from the installed Codex version.
+- Add a fixture-driven AppServer simulator for end-to-end tests.
+- Confirm and harden the live Feishu reply command.
+- Add a launchd template only after the dry-run loop is proven stable.
+- Promote useful dispatcher examples into [.agents/skills/smart-shadow/SKILL.md](.agents/skills/smart-shadow/SKILL.md).
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)

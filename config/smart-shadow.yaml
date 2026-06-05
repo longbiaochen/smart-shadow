@@ -1,0 +1,32 @@
+service:
+  name: smart-shadowd
+  logLevel: info
+
+feishu:
+  cliBin: lark-cli
+  eventKey: im.message.receive_v1
+  identity: bot
+  allowedUsers: []
+  allowedChats: []
+  requireMentionInGroup: false
+  dryRunReply: true
+
+codex:
+  appServer:
+    command: codex
+    args:
+      - app-server
+      - --stdio
+  model: gpt-5.5
+  defaultCwd: .
+  mainProjectKey: smart-shadow
+  dispatcherThreadTitle: smart-shadow-main
+  approvalPolicy: unlessTrusted
+  sandbox: workspaceWrite
+
+routing:
+  maxCandidateThreads: 10
+  confidenceThreshold: 0.6
+
+registry:
+  path: .smart-shadow/registry.json

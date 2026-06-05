@@ -1,8 +1,11 @@
 .build/
 .swiftpm/
 .codex/
+node_modules/
 dist/
+dist-shadowd/
 var/
+.smart-shadow/
 config/smart-shadow.json
 !config/smart-shadow.example.json
 config/*.bak-*
