@@ -9,7 +9,7 @@ feishu:
   allowedUsers: []
   allowedChats: []
   requireMentionInGroup: false
-  dryRunReply: true
+  dryRunReply: false
 
 codex:
   appServer:

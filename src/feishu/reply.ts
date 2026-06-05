@@ -1,5 +1,12 @@
 import { execa } from "execa";
 
+export function buildReplyArgs(input: { chatId: string; messageId?: string; text: string }): string[] {
+  if (input.messageId) {
+    return ["im", "+messages-reply", "--as", "bot", "--message-id", input.messageId, "--text", input.text];
+  }
+  return ["im", "+messages-send", "--as", "bot", "--chat-id", input.chatId, "--text", input.text];
+}
+
 export class FeishuReplier {
   constructor(private readonly options: { cliBin: string; dryRunReply: boolean }) {}
 
@@ -8,7 +15,6 @@ export class FeishuReplier {
       process.stdout.write(`[dry-run feishu reply] chat=${input.chatId} thread=${input.threadId ?? ""} message=${input.messageId ?? ""}\n${input.text}\n`);
       return;
     }
-    // TODO: confirm the exact send command against `lark-cli im --help` on this Mac.
-    await execa(this.options.cliBin, ["im", "send", "--chat-id", input.chatId, "--text", input.text], { stdin: "ignore" });
+    await execa(this.options.cliBin, buildReplyArgs(input), { stdin: "ignore" });
   }
 }
