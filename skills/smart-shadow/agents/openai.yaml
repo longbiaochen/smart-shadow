@@ -1,0 +1,4 @@
+interface:
+  display_name: "Smart Shadow"
+  short_description: "Route Feishu tasks into Codex work"
+  default_prompt: "Use $smart-shadow to turn this Feishu message into an executable Codex task and prepare a reply summary."
