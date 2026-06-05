@@ -22,7 +22,6 @@ export async function runFixtureDemo(): Promise<string> {
   const msg = normalizeFeishuEvent(rawEvent, defaultConfig.feishu.eventKey);
   const registry = new Registry(":memory:");
   await registry.load();
-  const projects = registry.getProjects();
   const codex = {
     ensureMainThread: async () => "demo-main-thread",
     startTurn: async () => ({ turnId: "demo-turn" }),
@@ -40,7 +39,7 @@ export async function runFixtureDemo(): Promise<string> {
   };
 
   lines.push(`received Feishu message: ${msg.message.id} text="${msg.message.text}"`);
-  const decision = await dispatchMessage({ msg, projects, candidateThreads: [], codex, registry });
+  const decision = await dispatchMessage({ msg, codex, registry });
   lines.push(`dispatcher decision: ${decision.action} confidence=${decision.confidence}`);
   const replyText = decision.replyText ?? decision.reason;
   lines.push(`[dry-run feishu reply] chat=${msg.chat.id} thread=${msg.thread.id ?? ""} message=${msg.message.id}`);

@@ -1,3 +1,5 @@
+import { readdir } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { CodexAppServerClient } from "./codex/appserver.js";
@@ -11,7 +13,7 @@ import { createLogger } from "./logger.js";
 import { isAllowedMessage, shouldProcessMessage } from "./shadow/guard.js";
 import { normalizeFeishuEvent } from "./shadow/normalize.js";
 import { Registry } from "./shadow/registry.js";
-import type { CandidateThread, DispatchDecision, KnownProject, ShadowMessage, ThreadBinding } from "./shadow/types.js";
+import type { DispatchDecision, KnownProject, ShadowMessage, ThreadBinding } from "./shadow/types.js";
 
 export function parseCliArgs(argv = process.argv): { maxEvents?: number; timeoutMs?: number } {
   const maxEventsArg = argv.find((arg) => arg.startsWith("--max-events="));
@@ -26,17 +28,42 @@ function bindingKey(msg: ShadowMessage): string {
   return `feishu:${msg.chat.id}:${msg.thread.id ?? msg.message.id}`;
 }
 
-function uniqueThreads(items: CandidateThread[]): CandidateThread[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.threadId)) return false;
-    seen.add(item.threadId);
-    return true;
-  });
-}
-
 function resolveCwd(cwd: string): string {
   return path.isAbsolute(cwd) ? cwd : path.resolve(process.cwd(), cwd);
+}
+
+function projectAliases(slug: string): string[] {
+  const compact = slug.replace(/[-_\s]/g, "");
+  return Array.from(new Set([slug, compact, slug.replace(/-/g, " "), slug.replace(/-/g, "")].filter(Boolean)));
+}
+
+export async function discoverLocalProjects(projectsRoot = path.join(os.homedir(), "Projects")): Promise<KnownProject[]> {
+  let entries;
+  try {
+    entries = await readdir(projectsRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .map((entry) => ({
+      key: entry.name,
+      name: entry.name,
+      cwd: path.join(projectsRoot, entry.name),
+      aliases: projectAliases(entry.name)
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+export async function knownProjectsForDispatch(registry: Registry): Promise<KnownProject[]> {
+  const byKey = new Map<string, KnownProject>();
+  for (const project of registry.getProjects()) {
+    byKey.set(project.key, { ...project, cwd: resolveCwd(project.cwd) });
+  }
+  for (const project of await discoverLocalProjects()) {
+    byKey.set(project.key, project);
+  }
+  return Array.from(byKey.values()).sort((a, b) => a.key.localeCompare(b.key));
 }
 
 function cwdAllowed(cwd: string | undefined, projects: KnownProject[], msg: ShadowMessage): boolean {
@@ -45,29 +72,10 @@ function cwdAllowed(cwd: string | undefined, projects: KnownProject[], msg: Shad
   return msg.message.text.includes(cwd);
 }
 
-async function collectCandidates(input: {
-  msg: ShadowMessage;
-  binding?: ThreadBinding;
-  codex: CodexThreads;
-  projects: KnownProject[];
-  limit: number;
-}): Promise<CandidateThread[]> {
-  const candidates: CandidateThread[] = [];
-  if (input.binding) {
-    candidates.push({ threadId: input.binding.codexThreadId, cwd: input.binding.cwd, updatedAt: input.binding.updatedAt });
-  }
-  candidates.push(...await input.codex.listCandidates({ limit: input.limit }));
-  candidates.push(...await input.codex.listCandidates({ searchTerm: input.msg.message.text.slice(0, 80), limit: input.limit }));
-  for (const project of input.projects) {
-    candidates.push(...await input.codex.listCandidates({ cwd: project.cwd, limit: 5 }));
-  }
-  return uniqueThreads(candidates).slice(0, input.limit);
-}
-
-async function handleDecision(input: {
+export async function handleDecision(input: {
   msg: ShadowMessage;
   decision: DispatchDecision;
-  candidates: CandidateThread[];
+  binding?: ThreadBinding;
   bindingKey: string;
   codex: CodexThreads;
   registry: Registry;
@@ -80,9 +88,12 @@ async function handleDecision(input: {
   if (decision.action === "reject") return decision.reason;
 
   if (decision.action === "resume_thread") {
-    const allowed = input.candidates.some((item) => item.threadId === decision.targetThreadId);
-    if (!decision.targetThreadId || !allowed) return "我需要更多信息才能判断应该恢复哪个 Codex thread。";
-    await codex.resumeThread({ threadId: decision.targetThreadId, cwd: decision.cwd });
+    if (!decision.targetThreadId) return "我需要更多信息才能判断应该恢复哪个 Codex thread。";
+    try {
+      await codex.resumeThread({ threadId: decision.targetThreadId, cwd: decision.cwd });
+    } catch {
+      return "我需要更多信息才能判断应该恢复哪个 Codex thread。";
+    }
     const prompt = buildWorkingThreadPrompt({ msg, decision });
     await codex.startTurn({ threadId: decision.targetThreadId, cwd: decision.cwd, prompt });
     const completed = await codex.waitForTurnCompleted({ threadId: decision.targetThreadId });
@@ -118,11 +129,19 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   const { maxEvents, timeoutMs } = parseCliArgs();
   const logger = createLogger(config.service.logLevel);
+  logger.info({
+    defaultCwd: config.codex.defaultCwd,
+    mainProjectKey: config.codex.mainProjectKey,
+    dispatcherThreadTitle: config.codex.dispatcherThreadTitle,
+    registryPath: config.registry.path
+  }, "shadowd codex routing config");
   if (config.feishu.allowedUsers.length === 0 && config.feishu.allowedChats.length === 0) {
     logger.warn("allowedUsers and allowedChats are empty; local development mode allows all Feishu messages");
   }
   const registry = new Registry(config.registry.path);
   await registry.load();
+  const startupProjects = await knownProjectsForDispatch(registry);
+  logger.info({ projectCount: startupProjects.length, firstProjects: startupProjects.slice(0, 12).map((project) => project.key) }, "loaded startup dispatch projects");
   const appServer = new CodexAppServerClient(config);
   await appServer.start();
   const codex = new CodexThreads(appServer, config);
@@ -173,10 +192,10 @@ async function main(): Promise<void> {
         }
         const key = bindingKey(msg);
         const binding = registry.getBinding(key);
-        const projects = registry.getProjects();
-        const candidates = await collectCandidates({ msg, binding, codex, projects, limit: config.routing.maxCandidateThreads });
-        const decision = await dispatchMessage({ msg, projects, candidateThreads: candidates, existingBinding: binding, codex, registry });
-        const text = await handleDecision({ msg, decision, candidates, bindingKey: key, codex, registry, replier, projects });
+        const projects = await knownProjectsForDispatch(registry);
+        logger.info({ projectCount: projects.length, firstProjects: projects.slice(0, 8).map((project) => project.key) }, "loaded dispatch projects");
+        const decision = await dispatchMessage({ msg, existingBinding: binding, codex, registry });
+        const text = await handleDecision({ msg, decision, binding, bindingKey: key, codex, registry, replier, projects });
         await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text });
         registry.markProcessed(msg.message.id, decision.action);
         await registry.save();

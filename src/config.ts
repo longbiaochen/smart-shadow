@@ -17,9 +17,9 @@ export const defaultConfig = {
   codex: {
     appServer: { command: "codex", args: ["app-server", "--stdio"] },
     model: "gpt-5.5",
-    defaultCwd: ".",
-    mainProjectKey: "smart-shadow",
-    dispatcherThreadTitle: "smart-shadow-main",
+    defaultCwd: "",
+    mainProjectKey: "chats",
+    dispatcherThreadTitle: "shadowd-router",
     approvalPolicy: "unlessTrusted",
     sandbox: "workspaceWrite"
   },

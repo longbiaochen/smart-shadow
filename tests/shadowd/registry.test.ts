@@ -16,6 +16,8 @@ test("registry creates default file and persists projects bindings and processed
     const data = await registry.load();
 
     assert.equal(data.version, 1);
+    assert.equal(data.mainThread.title, "shadowd-router");
+    assert.equal(data.mainThread.cwd, "");
     assert.equal(data.projects[0]?.key, "smart-shadow");
     assert.equal(registry.hasProcessed("m-1"), false);
 

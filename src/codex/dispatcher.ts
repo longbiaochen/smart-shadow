@@ -3,7 +3,7 @@ import { z } from "zod";
 import { buildDispatcherPrompt } from "./prompts.js";
 import { extractJsonObject } from "../shadow/json.js";
 import type { Registry } from "../shadow/registry.js";
-import type { CandidateThread, DispatchDecision, KnownProject, ShadowMessage, ThreadBinding } from "../shadow/types.js";
+import type { DispatchDecision, ShadowMessage, ThreadBinding } from "../shadow/types.js";
 
 const DispatchDecisionSchema = z.object({
   action: z.enum(["reply_only", "resume_thread", "start_thread", "ask_user", "reject"]),
@@ -27,8 +27,6 @@ export function parseDispatchDecision(text: string): DispatchDecision {
 
 export async function dispatchMessage(input: {
   msg: ShadowMessage;
-  projects: KnownProject[];
-  candidateThreads: CandidateThread[];
   existingBinding?: ThreadBinding;
   codex: {
     ensureMainThread(registry: Registry): Promise<string>;

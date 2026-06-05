@@ -5,7 +5,7 @@ import type { KnownProject, MainThread, RegistryData, ThreadBinding } from "./ty
 
 const defaultData = (): RegistryData => ({
   version: 1,
-  mainThread: { threadId: "", cwd: "", title: "smart-shadow-main" },
+  mainThread: { threadId: "", cwd: "", title: "shadowd-router" },
   projects: [
     { key: "smart-shadow", name: "智能影子", cwd: ".", aliases: ["智能影子", "Smart Shadow", "smartshadow"] }
   ],

@@ -42,22 +42,33 @@ export class CodexThreads {
 
   async ensureMainThread(registry: Registry): Promise<string> {
     const existing = registry.getMainThread();
-    if (existing && isValidCodexThreadId(existing.threadId)) {
+    const expectedCwd = this.config.codex.defaultCwd;
+    const expectedTitle = this.config.codex.dispatcherThreadTitle;
+    const canReuseExisting = existing
+      && existing.cwd === expectedCwd
+      && existing.title === expectedTitle
+      && isValidCodexThreadId(existing.threadId);
+    if (canReuseExisting) {
       try {
-        await this.resumeThread({ threadId: existing.threadId, cwd: existing.cwd || this.config.codex.defaultCwd });
+        await this.resumeThread({ threadId: existing.threadId, cwd: existing.cwd || expectedCwd || undefined });
         return existing.threadId;
       } catch {
         // Stale local registry entries are expected after app-server/session cleanup.
       }
     }
-    const threadId = await this.startThread({ cwd: this.config.codex.defaultCwd, title: this.config.codex.dispatcherThreadTitle });
-    registry.setMainThread({ threadId, cwd: this.config.codex.defaultCwd, title: this.config.codex.dispatcherThreadTitle });
+    const dispatcherCwd = expectedCwd || undefined;
+    const threadId = await this.startThread({ cwd: dispatcherCwd, title: expectedTitle });
+    registry.setMainThread({ threadId, cwd: expectedCwd, title: expectedTitle });
     await registry.save();
     return threadId;
   }
 
-  async startThread(input: { cwd: string; title?: string }): Promise<string> {
-    const result = await this.client.request<unknown>("thread/start", input);
+  async startThread(input: { cwd?: string; title?: string }): Promise<string> {
+    const params = {
+      ...(input.cwd ? { cwd: input.cwd } : {}),
+      ...(input.title ? { title: input.title } : {})
+    };
+    const result = await this.client.request<unknown>("thread/start", params);
     return extractThreadId(result);
   }
 

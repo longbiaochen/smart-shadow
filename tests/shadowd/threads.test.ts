@@ -54,7 +54,7 @@ test("waitForTurnCompleted returns aggregated agent message deltas", async () =>
   assert.equal((await wait).finalText, "{\"action\":\"reply_only\"}");
 });
 
-test("ensureMainThread replaces stale registry thread ids", async () => {
+test("ensureMainThread replaces stale or non-Chats registry thread ids", async () => {
   const registry = new Registry(":memory:");
   await registry.load();
   registry.setMainThread({
@@ -63,10 +63,12 @@ test("ensureMainThread replaces stale registry thread ids", async () => {
     title: "smart-shadow-main"
   });
   const methods: string[] = [];
+  const requests: Array<{ method: string; params?: unknown }> = [];
   const client = {
     onNotification: () => undefined,
-    request: async (method: string) => {
+    request: async (method: string, params?: unknown) => {
       methods.push(method);
+      requests.push({ method, params });
       if (method === "thread/resume") throw new Error("thread not found");
       if (method === "thread/start") return { thread: { id: "650e8400-e29b-41d4-a716-446655440000" } };
       return {};
@@ -75,6 +77,30 @@ test("ensureMainThread replaces stale registry thread ids", async () => {
   const threads = new CodexThreads(client as never, defaultConfig);
 
   assert.equal(await threads.ensureMainThread(registry), "650e8400-e29b-41d4-a716-446655440000");
-  assert.deepEqual(methods, ["thread/resume", "thread/start"]);
+  assert.deepEqual(methods, ["thread/start"]);
+  assert.deepEqual(requests[0]?.params, { title: "shadowd-router" });
   assert.equal(registry.getMainThread()?.threadId, "650e8400-e29b-41d4-a716-446655440000");
+  assert.equal(registry.getMainThread()?.cwd, "");
+});
+
+test("ensureMainThread reuses the current Chats router thread", async () => {
+  const registry = new Registry(":memory:");
+  await registry.load();
+  registry.setMainThread({
+    threadId: "550e8400-e29b-41d4-a716-446655440000",
+    cwd: "",
+    title: "shadowd-router"
+  });
+  const methods: string[] = [];
+  const client = {
+    onNotification: () => undefined,
+    request: async (method: string) => {
+      methods.push(method);
+      return {};
+    }
+  };
+  const threads = new CodexThreads(client as never, defaultConfig);
+
+  assert.equal(await threads.ensureMainThread(registry), "550e8400-e29b-41d4-a716-446655440000");
+  assert.deepEqual(methods, ["thread/resume"]);
 });

@@ -134,7 +134,7 @@ The script builds `smart-shadow-menu`, stages `dist/SmartShadowMenu.app`, and la
 flowchart LR
     Feishu["Feishu CLI event consume"] --> D["shadowd"]
     D --> AppServer["Codex AppServer stdio"]
-    AppServer --> Main["smart-shadow-main dispatcher thread"]
+    AppServer --> Main["Chats: shadowd-router dispatcher thread"]
     Main --> Work["target Codex working thread"]
     Work --> D
     D --> Reply["Feishu reply or dry-run output"]
@@ -165,6 +165,8 @@ SMART_SHADOW_CONFIG=/absolute/path/to/smart-shadow.yaml pnpm dev:shadowd
 ```
 
 The registry defaults to `.smart-shadow/registry.json` and is created automatically. It stores the dispatcher thread id, known projects, Feishu-to-Codex thread bindings, and processed message ids.
+
+The dispatcher prompt intentionally does not include the full project or session inventory. Routing uses the compact Feishu message plus any existing binding, while project/session inventory is resolved through Codex/AppServer or daemon-side validation before execution.
 
 Run development mode with one event and a timeout:
 
