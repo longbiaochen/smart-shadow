@@ -13,6 +13,15 @@ import { normalizeFeishuEvent } from "./shadow/normalize.js";
 import { Registry } from "./shadow/registry.js";
 import type { CandidateThread, DispatchDecision, KnownProject, ShadowMessage, ThreadBinding } from "./shadow/types.js";
 
+export function parseCliArgs(argv = process.argv): { maxEvents?: number; timeoutMs?: number } {
+  const maxEventsArg = argv.find((arg) => arg.startsWith("--max-events="));
+  const timeoutArg = argv.find((arg) => arg.startsWith("--timeout="));
+  const maxEvents = maxEventsArg ? Number(maxEventsArg.split("=")[1]) : undefined;
+  const timeoutValue = timeoutArg?.split("=")[1];
+  const timeoutMs = timeoutValue ? Number(timeoutValue.replace(/s$/, "")) * 1000 : undefined;
+  return { maxEvents, timeoutMs };
+}
+
 function bindingKey(msg: ShadowMessage): string {
   return `feishu:${msg.chat.id}:${msg.thread.id ?? msg.message.id}`;
 }
@@ -107,10 +116,7 @@ async function handleDecision(input: {
 
 async function main(): Promise<void> {
   const config = await loadConfig();
-  const maxEventsArg = process.argv.find((arg) => arg.startsWith("--max-events="));
-  const timeoutArg = process.argv.find((arg) => arg.startsWith("--timeout="));
-  const maxEvents = maxEventsArg ? Number(maxEventsArg.split("=")[1]) : undefined;
-  const timeoutMs = timeoutArg ? Number(timeoutArg.split("=")[1].replace(/s$/, "")) * 1000 : undefined;
+  const { maxEvents, timeoutMs } = parseCliArgs();
   const logger = createLogger(config.service.logLevel);
   if (config.feishu.allowedUsers.length === 0 && config.feishu.allowedChats.length === 0) {
     logger.warn("allowedUsers and allowedChats are empty; local development mode allows all Feishu messages");
@@ -137,36 +143,40 @@ async function main(): Promise<void> {
   process.once("SIGINT", () => void stop());
   process.once("SIGTERM", () => void stop());
 
-  await listener.start(async (event) => {
-    const msg = normalizeFeishuEvent(event, config.feishu.eventKey);
-    logger.info({ messageId: msg.message.id, chatId: msg.chat.id, textPreview: msg.message.text.slice(0, 120) }, "received Feishu message");
-    const allowed = isAllowedMessage(msg, config);
-    if (!allowed.allowed) {
-      logger.warn({ reason: allowed.reason, messageId: msg.message.id }, "rejected Feishu message");
-      if (config.feishu.dryRunReply) await replier.reply({ chatId: msg.chat.id, messageId: msg.message.id, text: `无权限：${allowed.reason}` });
-      return;
-    }
-    const processCheck = shouldProcessMessage(msg, registry);
-    if (!processCheck.shouldProcess) {
-      logger.info({ reason: processCheck.reason, messageId: msg.message.id }, "skipped Feishu message");
-      return;
-    }
-    if (!msg.message.text.trim()) {
-      await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text: "暂不支持此消息类型。" });
-      registry.markProcessed(msg.message.id, "unsupported_message_type");
+  try {
+    await listener.start(async (event) => {
+      const msg = normalizeFeishuEvent(event, config.feishu.eventKey);
+      logger.info({ messageId: msg.message.id, chatId: msg.chat.id, textPreview: msg.message.text.slice(0, 120) }, "received Feishu message");
+      const allowed = isAllowedMessage(msg, config);
+      if (!allowed.allowed) {
+        logger.warn({ reason: allowed.reason, messageId: msg.message.id }, "rejected Feishu message");
+        if (config.feishu.dryRunReply) await replier.reply({ chatId: msg.chat.id, messageId: msg.message.id, text: `无权限：${allowed.reason}` });
+        return;
+      }
+      const processCheck = shouldProcessMessage(msg, registry);
+      if (!processCheck.shouldProcess) {
+        logger.info({ reason: processCheck.reason, messageId: msg.message.id }, "skipped Feishu message");
+        return;
+      }
+      if (!msg.message.text.trim()) {
+        await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text: "暂不支持此消息类型。" });
+        registry.markProcessed(msg.message.id, "unsupported_message_type");
+        await registry.save();
+        return;
+      }
+      const key = bindingKey(msg);
+      const binding = registry.getBinding(key);
+      const projects = registry.getProjects();
+      const candidates = await collectCandidates({ msg, binding, codex, projects, limit: config.routing.maxCandidateThreads });
+      const decision = await dispatchMessage({ msg, projects, candidateThreads: candidates, existingBinding: binding, codex, registry });
+      const text = await handleDecision({ msg, decision, candidates, bindingKey: key, codex, registry, replier, projects });
+      await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text });
+      registry.markProcessed(msg.message.id, decision.action);
       await registry.save();
-      return;
-    }
-    const key = bindingKey(msg);
-    const binding = registry.getBinding(key);
-    const projects = registry.getProjects();
-    const candidates = await collectCandidates({ msg, binding, codex, projects, limit: config.routing.maxCandidateThreads });
-    const decision = await dispatchMessage({ msg, projects, candidateThreads: candidates, existingBinding: binding, codex, registry });
-    const text = await handleDecision({ msg, decision, candidates, bindingKey: key, codex, registry, replier, projects });
-    await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text });
-    registry.markProcessed(msg.message.id, decision.action);
-    await registry.save();
-  });
+    });
+  } finally {
+    await appServer.stop();
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

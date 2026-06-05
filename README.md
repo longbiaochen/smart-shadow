@@ -182,6 +182,7 @@ Dry-run replies print the exact outgoing message instead of sending it:
 Test dispatcher and local bridge logic:
 
 ```sh
+pnpm demo:shadowd
 pnpm test:shadowd
 pnpm typecheck:shadowd
 ```

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:shadowd": "tsx src/index.ts",
+    "demo:shadowd": "tsx src/demo.ts",
     "test:shadowd": "node --import tsx --test tests/shadowd/*.test.ts",
     "typecheck:shadowd": "tsc --noEmit"
   },
