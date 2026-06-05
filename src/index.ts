@@ -158,21 +158,35 @@ async function main(): Promise<void> {
         logger.info({ reason: processCheck.reason, messageId: msg.message.id }, "skipped Feishu message");
         return;
       }
-      if (!msg.message.text.trim()) {
-        await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text: "暂不支持此消息类型。" });
-        registry.markProcessed(msg.message.id, "unsupported_message_type");
+      let typingReactionId: string | undefined;
+      try {
+        try {
+          typingReactionId = await replier.addTypingReaction({ messageId: msg.message.id });
+        } catch (error) {
+          logger.warn({ messageId: msg.message.id, error: String(error) }, "failed to add Feishu typing reaction");
+        }
+        if (!msg.message.text.trim()) {
+          await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text: "暂不支持此消息类型。" });
+          registry.markProcessed(msg.message.id, "unsupported_message_type");
+          await registry.save();
+          return;
+        }
+        const key = bindingKey(msg);
+        const binding = registry.getBinding(key);
+        const projects = registry.getProjects();
+        const candidates = await collectCandidates({ msg, binding, codex, projects, limit: config.routing.maxCandidateThreads });
+        const decision = await dispatchMessage({ msg, projects, candidateThreads: candidates, existingBinding: binding, codex, registry });
+        const text = await handleDecision({ msg, decision, candidates, bindingKey: key, codex, registry, replier, projects });
+        await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text });
+        registry.markProcessed(msg.message.id, decision.action);
         await registry.save();
-        return;
+      } finally {
+        try {
+          await replier.deleteReaction({ messageId: msg.message.id, reactionId: typingReactionId });
+        } catch (error) {
+          logger.warn({ messageId: msg.message.id, error: String(error) }, "failed to remove Feishu typing reaction");
+        }
       }
-      const key = bindingKey(msg);
-      const binding = registry.getBinding(key);
-      const projects = registry.getProjects();
-      const candidates = await collectCandidates({ msg, binding, codex, projects, limit: config.routing.maxCandidateThreads });
-      const decision = await dispatchMessage({ msg, projects, candidateThreads: candidates, existingBinding: binding, codex, registry });
-      const text = await handleDecision({ msg, decision, candidates, bindingKey: key, codex, registry, replier, projects });
-      await replier.reply({ chatId: msg.chat.id, threadId: msg.thread.id, messageId: msg.message.id, text });
-      registry.markProcessed(msg.message.id, decision.action);
-      await registry.save();
     });
   } finally {
     await appServer.stop();

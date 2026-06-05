@@ -13,6 +13,7 @@ usage() {
 Usage: bin/smart-shadowd <command>
 
 Commands:
+  run                      Run smart-shadowd in the foreground
   render-plist [--stdout]  Render the LaunchAgent plist
   install                  Install and bootstrap the user LaunchAgent
   uninstall                Boot out and remove the user LaunchAgent
@@ -26,6 +27,21 @@ EOF
 
 render_plist() {
   sed "s#__PROJECT_ROOT__#$ROOT_DIR#g" "$TEMPLATE"
+}
+
+run_daemon() {
+  cd "$ROOT_DIR"
+  export SMART_SHADOW_CONFIG="${SMART_SHADOW_CONFIG:-$ROOT_DIR/config/smart-shadow.yaml}"
+  export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/longbiao/.npm-global/bin:$PATH"
+
+  mkdir -p "$ROOT_DIR/var/logs" "$ROOT_DIR/.smart-shadow"
+
+  if [[ ! -x "$ROOT_DIR/node_modules/.bin/tsx" ]]; then
+    echo "missing node_modules/.bin/tsx; run pnpm install in $ROOT_DIR" >&2
+    exit 78
+  fi
+
+  exec "$ROOT_DIR/node_modules/.bin/tsx" "$ROOT_DIR/src/index.ts"
 }
 
 install_agent() {
@@ -77,6 +93,9 @@ status_agent() {
 }
 
 case "${1:-}" in
+  run)
+    run_daemon
+    ;;
   render-plist)
     if [[ "${2:-}" == "--stdout" || -z "${2:-}" ]]; then
       render_plist

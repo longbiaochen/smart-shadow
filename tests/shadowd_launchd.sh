@@ -6,7 +6,8 @@ OUT="$("$ROOT/bin/smart-shadowd" render-plist --stdout)"
 
 for pattern in \
   "me.longbiaochen.smart-shadowd" \
-  "$ROOT/bin/smart-shadowd-run" \
+  "$ROOT/bin/smart-shadowd" \
+  "<string>run</string>" \
   "$ROOT/config/smart-shadow.yaml" \
   "$ROOT/var/logs/smart-shadowd.out.log" \
   "$ROOT/var/logs/smart-shadowd.err.log" \

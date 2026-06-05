@@ -6,7 +6,8 @@
   <string>me.longbiaochen.smart-shadowd</string>
   <key>ProgramArguments</key>
   <array>
-    <string>__PROJECT_ROOT__/bin/smart-shadowd-run</string>
+    <string>__PROJECT_ROOT__/bin/smart-shadowd</string>
+    <string>run</string>
   </array>
   <key>WorkingDirectory</key>
   <string>__PROJECT_ROOT__</string>
