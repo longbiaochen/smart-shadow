@@ -4,7 +4,7 @@ import YAML from "yaml";
 import { z } from "zod";
 
 export const defaultConfig = {
-  service: { name: "smart-shadowd", logLevel: "info" },
+  service: { name: "shadowd", logLevel: "info" },
   feishu: {
     cliBin: "lark-cli",
     eventKey: "im.message.receive_v1",

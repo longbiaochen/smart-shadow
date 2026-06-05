@@ -1,5 +1,5 @@
 service:
-  name: smart-shadowd
+  name: shadowd
   logLevel: info
 
 feishu:

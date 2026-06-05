@@ -31,7 +31,7 @@ export async function runFixtureDemo(): Promise<string> {
         action: "reply_only",
         confidence: 0.95,
         reason: "demo acknowledgement",
-        replyText: "Smart Shadow 收到：Feishu -> smart-shadowd -> dispatcher -> dry-run reply 链路正常。",
+        replyText: "Smart Shadow 收到：Feishu -> shadowd -> dispatcher -> dry-run reply 链路正常。",
         riskLevel: "low",
         requiresApproval: false
       }),

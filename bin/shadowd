@@ -3,17 +3,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-LABEL="me.longbiaochen.smart-shadowd"
+LABEL="me.longbiaochen.shadowd"
+OLD_LABEL="me.longbiaochen.smart-shadowd"
 DOMAIN="gui/$(id -u)"
 PLIST_DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
+OLD_PLIST_DEST="$HOME/Library/LaunchAgents/$OLD_LABEL.plist"
 TEMPLATE="$ROOT_DIR/launchd/$LABEL.plist.template"
 
 usage() {
   cat <<EOF
-Usage: bin/smart-shadowd <command>
+Usage: bin/shadowd <command>
 
 Commands:
-  run                      Run smart-shadowd in the foreground
+  run                      Run shadowd in the foreground
   render-plist [--stdout]  Render the LaunchAgent plist
   install                  Install and bootstrap the user LaunchAgent
   uninstall                Boot out and remove the user LaunchAgent
@@ -21,7 +23,7 @@ Commands:
   stop                     Stop the LaunchAgent
   restart                  Restart the LaunchAgent
   status                   Show launchctl status and recent logs
-  logs                     Tail smart-shadowd logs
+  logs                     Tail shadowd logs
 EOF
 }
 
@@ -48,6 +50,8 @@ install_agent() {
   mkdir -p "$HOME/Library/LaunchAgents" "$ROOT_DIR/var/logs" "$ROOT_DIR/.smart-shadow"
   render_plist > "$PLIST_DEST"
   plutil -lint "$PLIST_DEST" >/dev/null
+  launchctl bootout "$DOMAIN" "$OLD_PLIST_DEST" >/dev/null 2>&1 || true
+  rm -f "$OLD_PLIST_DEST"
   launchctl bootout "$DOMAIN" "$PLIST_DEST" >/dev/null 2>&1 || true
   launchctl unsetenv GITHUB_PAT_TOKEN >/dev/null 2>&1 || true
   env -u GITHUB_PAT_TOKEN launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
@@ -85,11 +89,11 @@ status_agent() {
     }
   '
   echo
-  echo "stdout: $ROOT_DIR/var/logs/smart-shadowd.out.log"
-  tail -n 20 "$ROOT_DIR/var/logs/smart-shadowd.out.log" 2>/dev/null || true
+  echo "stdout: $ROOT_DIR/var/logs/shadowd.out.log"
+  tail -n 20 "$ROOT_DIR/var/logs/shadowd.out.log" 2>/dev/null || true
   echo
-  echo "stderr: $ROOT_DIR/var/logs/smart-shadowd.err.log"
-  tail -n 40 "$ROOT_DIR/var/logs/smart-shadowd.err.log" 2>/dev/null || true
+  echo "stderr: $ROOT_DIR/var/logs/shadowd.err.log"
+  tail -n 40 "$ROOT_DIR/var/logs/shadowd.err.log" 2>/dev/null || true
 }
 
 case "${1:-}" in
@@ -126,7 +130,7 @@ case "${1:-}" in
     ;;
   logs)
     mkdir -p "$ROOT_DIR/var/logs"
-    tail -n 80 -f "$ROOT_DIR/var/logs/smart-shadowd.out.log" "$ROOT_DIR/var/logs/smart-shadowd.err.log"
+    tail -n 80 -f "$ROOT_DIR/var/logs/shadowd.out.log" "$ROOT_DIR/var/logs/shadowd.err.log"
     ;;
   -h|--help|help|"")
     usage

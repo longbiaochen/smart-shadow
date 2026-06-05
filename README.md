@@ -126,13 +126,13 @@ Run it with:
 
 The script builds `smart-shadow-menu`, stages `dist/SmartShadowMenu.app`, and launches it as an `LSUIElement` menu-bar app without a Dock icon.
 
-## smart-shadowd Feishu Bridge MVP
+## shadowd Feishu Bridge MVP
 
-`smart-shadowd` is an optional thin TypeScript bridge for Feishu-to-Codex task routing. It does not replace the Swift-native macOS core and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
+`shadowd` is an optional thin TypeScript bridge for Feishu-to-Codex task routing. It does not replace the Swift-native macOS core and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
 
 ```mermaid
 flowchart LR
-    Feishu["Feishu CLI event consume"] --> D["smart-shadowd"]
+    Feishu["Feishu CLI event consume"] --> D["shadowd"]
     D --> AppServer["Codex AppServer stdio"]
     AppServer --> Main["smart-shadow-main dispatcher thread"]
     Main --> Work["target Codex working thread"]

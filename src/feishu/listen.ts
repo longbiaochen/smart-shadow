@@ -23,7 +23,7 @@ export class FeishuEventListener {
     while (!this.stopped) {
       const code = await this.runOnce(onEvent);
       if (this.stopped || this.options.maxEvents) break;
-      process.stderr.write(`[smart-shadowd] lark-cli exited code=${code}; restarting in ${restartDelay}ms\n`);
+      process.stderr.write(`[shadowd] lark-cli exited code=${code}; restarting in ${restartDelay}ms\n`);
       await sleep(restartDelay);
       restartDelay = Math.min(restartDelay * 2, 30_000);
     }
@@ -47,7 +47,7 @@ export class FeishuEventListener {
     createInterface({ input: this.child.stderr }).on("line", (line) => {
       process.stderr.write(`[lark-cli] ${line}\n`);
       if (line.includes(`[event] ready event_key=${this.options.eventKey}`)) {
-        process.stderr.write(`[smart-shadowd] Feishu listener ready for ${this.options.eventKey}\n`);
+        process.stderr.write(`[shadowd] Feishu listener ready for ${this.options.eventKey}\n`);
       }
     });
 
@@ -58,7 +58,7 @@ export class FeishuEventListener {
         seen++;
         if (this.options.maxEvents && seen >= this.options.maxEvents) await this.stop();
       } catch (error) {
-        process.stderr.write(`[smart-shadowd] failed to process event: ${(error as Error).message}\n`);
+        process.stderr.write(`[shadowd] failed to process event: ${(error as Error).message}\n`);
       }
     });
 

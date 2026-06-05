@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>me.longbiaochen.smart-shadowd</string>
+  <string>me.longbiaochen.shadowd</string>
   <key>ProgramArguments</key>
   <array>
-    <string>__PROJECT_ROOT__/bin/smart-shadowd</string>
+    <string>__PROJECT_ROOT__/bin/shadowd</string>
     <string>run</string>
   </array>
   <key>WorkingDirectory</key>
@@ -23,8 +23,8 @@
   <key>RunAtLoad</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>__PROJECT_ROOT__/var/logs/smart-shadowd.out.log</string>
+  <string>__PROJECT_ROOT__/var/logs/shadowd.out.log</string>
   <key>StandardErrorPath</key>
-  <string>__PROJECT_ROOT__/var/logs/smart-shadowd.err.log</string>
+  <string>__PROJECT_ROOT__/var/logs/shadowd.err.log</string>
 </dict>
 </plist>

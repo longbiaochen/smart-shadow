@@ -108,7 +108,7 @@ export class CodexAppServerClient {
       for (const handler of this.requestHandlers) {
         await handler(request);
       }
-      this.write({ id: request.id, error: { code: -32601, message: "server requests are not supported by smart-shadowd MVP" } });
+      this.write({ id: request.id, error: { code: -32601, message: "server requests are not supported by shadowd MVP" } });
       return;
     }
     if (typeof msg.method === "string") {
