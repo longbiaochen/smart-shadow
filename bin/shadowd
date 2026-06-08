@@ -1,142 +1,123 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="me.longbiaochen.shadowd"
 OLD_LABEL="me.longbiaochen.smart-shadowd"
 DOMAIN="gui/$(id -u)"
 PLIST_DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 OLD_PLIST_DEST="$HOME/Library/LaunchAgents/$OLD_LABEL.plist"
 TEMPLATE="$ROOT_DIR/launchd/$LABEL.plist.template"
+DEFAULT_CONFIG="$ROOT_DIR/config/smart-shadow.example.json"
 
 usage() {
-  cat <<EOF
+  cat <<'EOF'
 Usage: bin/shadowd <command>
 
 Commands:
-  run                      Run shadowd in the foreground
-  render-plist [--stdout]  Render the LaunchAgent plist
-  install                  Install and bootstrap the user LaunchAgent
-  uninstall                Boot out and remove the user LaunchAgent
-  start                    Start the LaunchAgent
-  stop                     Stop the LaunchAgent
-  restart                  Restart the LaunchAgent
-  status                   Show launchctl status and recent logs
-  logs                     Tail shadowd logs
+  once [--dry-run] [--fixture PATH]       Reconcile the Life OS GitHub Project once
+  run                                     Run the Swift GitHub Project reconciler loop
+  inspect-issue [--issue N] [--fixture P] Inspect one Project issue plan
+  render-plist [--stdout]                 Render the LaunchAgent plist
+  install                                 Install and bootstrap the user LaunchAgent
+  uninstall                               Boot out and remove the user LaunchAgent
+  start                                   Start the LaunchAgent
+  stop                                    Stop the LaunchAgent
+  restart                                 Restart the LaunchAgent
+  status                                  Show launchctl status and recent logs
+  logs                                    Tail shadowd logs
 EOF
+}
+
+shadowd_config() {
+  if [[ -n "${SMART_SHADOW_CONFIG:-}" && "${SMART_SHADOW_CONFIG##*.}" == "json" ]]; then
+    printf '%s\n' "$SMART_SHADOW_CONFIG"
+  elif [[ -f "$ROOT_DIR/config/smart-shadow.json" ]]; then
+    printf '%s\n' "$ROOT_DIR/config/smart-shadow.json"
+  else
+    printf '%s\n' "$DEFAULT_CONFIG"
+  fi
+}
+
+ensure_core() {
+  if [[ ! -x "$ROOT_DIR/.build/debug/smart-shadow-mac-core" ]]; then
+    swift build --package-path "$ROOT_DIR" --product smart-shadow-mac-core >/dev/null
+  fi
+}
+
+run_core() {
+  ensure_core
+  exec "$ROOT_DIR/.build/debug/smart-shadow-mac-core" --config "$(shadowd_config)" shadowd "$@"
 }
 
 render_plist() {
   sed "s#__PROJECT_ROOT__#$ROOT_DIR#g" "$TEMPLATE"
 }
 
-run_daemon() {
-  cd "$ROOT_DIR"
-  export SMART_SHADOW_CONFIG="${SMART_SHADOW_CONFIG:-$ROOT_DIR/config/smart-shadow.yaml}"
-  export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/longbiao/.npm-global/bin:$PATH"
-
-  mkdir -p "$ROOT_DIR/var/logs" "$ROOT_DIR/.smart-shadow"
-
-  if [[ ! -x "$ROOT_DIR/node_modules/.bin/tsx" ]]; then
-    echo "missing node_modules/.bin/tsx; run pnpm install in $ROOT_DIR" >&2
-    exit 78
-  fi
-
-  exec "$ROOT_DIR/node_modules/.bin/tsx" "$ROOT_DIR/src/index.ts"
-}
-
 install_agent() {
-  mkdir -p "$HOME/Library/LaunchAgents" "$ROOT_DIR/var/logs" "$ROOT_DIR/.smart-shadow"
+  mkdir -p "$(dirname "$PLIST_DEST")" "$ROOT_DIR/var/logs"
   render_plist > "$PLIST_DEST"
-  plutil -lint "$PLIST_DEST" >/dev/null
+  plutil -lint "$PLIST_DEST"
   launchctl bootout "$DOMAIN" "$OLD_PLIST_DEST" >/dev/null 2>&1 || true
   rm -f "$OLD_PLIST_DEST"
   launchctl bootout "$DOMAIN" "$PLIST_DEST" >/dev/null 2>&1 || true
-  launchctl unsetenv GITHUB_PAT_TOKEN >/dev/null 2>&1 || true
-  env -u GITHUB_PAT_TOKEN launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
+  launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
   launchctl enable "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
   launchctl kickstart -k "$DOMAIN/$LABEL"
-  echo "installed $LABEL"
-  echo "$PLIST_DEST"
+  printf 'installed %s\n%s\n' "$LABEL" "$PLIST_DEST"
 }
 
 uninstall_agent() {
   launchctl bootout "$DOMAIN" "$PLIST_DEST" >/dev/null 2>&1 || true
   rm -f "$PLIST_DEST"
-  echo "uninstalled $LABEL"
+  printf 'uninstalled %s\n' "$LABEL"
 }
 
 status_agent() {
-  echo "label: $LABEL"
-  echo "plist: $PLIST_DEST"
-  local printed
-  printed="$(launchctl print "$DOMAIN/$LABEL" 2>/dev/null)" || {
-    echo "not loaded"
+  printf 'label: %s\nplist: %s\n' "$LABEL" "$PLIST_DEST"
+  if ! launchctl print "$DOMAIN/$LABEL"; then
+    printf 'not loaded\n'
     return 1
-  }
-  printf '%s\n' "$printed" | awk '
-    /^[[:space:]]*state =/ ||
-    /^[[:space:]]*program =/ ||
-    /^[[:space:]]*working directory =/ ||
-    /^[[:space:]]*stdout path =/ ||
-    /^[[:space:]]*stderr path =/ ||
-    /^[[:space:]]*runs =/ ||
-    /^[[:space:]]*pid =/ ||
-    /^[[:space:]]*last exit code =/ ||
-    /^[[:space:]]*last terminating signal =/ {
-      print
-    }
-  '
-  echo
-  echo "stdout: $ROOT_DIR/var/logs/shadowd.out.log"
-  tail -n 20 "$ROOT_DIR/var/logs/shadowd.out.log" 2>/dev/null || true
-  echo
-  echo "stderr: $ROOT_DIR/var/logs/shadowd.err.log"
-  tail -n 40 "$ROOT_DIR/var/logs/shadowd.err.log" 2>/dev/null || true
+  fi
+  tail_log "$ROOT_DIR/var/logs/shadowd.out.log" stdout 20
+  tail_log "$ROOT_DIR/var/logs/shadowd.err.log" stderr 40
 }
 
-case "${1:-}" in
-  run)
-    run_daemon
-    ;;
+tail_log() {
+  local path="$1" label="$2" lines="$3"
+  printf '\n%s: %s\n' "$label" "$path"
+  [[ -f "$path" ]] && tail -n "$lines" "$path"
+}
+
+command="${1:-}"
+shift || true
+
+case "$command" in
+  ""|-h|--help|help) usage ;;
+  once|run|inspect-issue) run_core "$command" "$@" ;;
   render-plist)
-    if [[ "${2:-}" == "--stdout" || -z "${2:-}" ]]; then
-      render_plist
-    else
-      usage >&2
+    if [[ "$#" -gt 0 && "$*" != "--stdout" ]]; then
+      usage
       exit 2
     fi
+    render_plist
     ;;
-  install)
-    install_agent
-    ;;
-  uninstall)
-    uninstall_agent
-    ;;
-  start)
-    launchctl kickstart -k "$DOMAIN/$LABEL"
-    ;;
-  stop)
-    launchctl kill TERM "$DOMAIN/$LABEL" 2>/dev/null || true
-    ;;
+  install) install_agent ;;
+  uninstall) uninstall_agent ;;
+  start) launchctl kickstart -k "$DOMAIN/$LABEL" ;;
+  stop) launchctl kill TERM "$DOMAIN/$LABEL" >/dev/null 2>&1 || true ;;
   restart)
-    launchctl kill TERM "$DOMAIN/$LABEL" 2>/dev/null || true
+    launchctl kill TERM "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
     sleep 1
     launchctl kickstart -k "$DOMAIN/$LABEL"
     ;;
-  status)
-    status_agent
-    ;;
+  status) status_agent ;;
   logs)
     mkdir -p "$ROOT_DIR/var/logs"
     tail -n 80 -f "$ROOT_DIR/var/logs/shadowd.out.log" "$ROOT_DIR/var/logs/shadowd.err.log"
     ;;
-  -h|--help|help|"")
-    usage
-    ;;
   *)
-    usage >&2
+    usage
     exit 2
     ;;
 esac

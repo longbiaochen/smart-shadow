@@ -1,11 +1,18 @@
+import Contacts
 import EventKit
 import Foundation
 import CryptoKit
+import Security
 import SQLite3
 
 let launchdLabel = "me.longbiaochen.smart-shadow"
 let launchdTarget = "\(NSHomeDirectory())/Library/LaunchAgents/\(launchdLabel).plist"
-let configurableSources = ["file_metadata", "lark_daily_context", "chrome_bookmarks", "apple_reminders_inbox", "apple_mail_summary", "apple_mail_app"]
+let configurableSources = ["file_metadata", "lark_daily_context", "lark_calendar_events", "lark_tasks", "google_calendar_events", "google_tasks", "google_contacts", "chrome_bookmarks", "apple_reminders_inbox", "apple_mail_summary"]
+let larkStructuredSources = Set(["lark_calendar_events", "lark_tasks"])
+let googleSyncSources = Set(["google_calendar_events", "google_tasks", "google_contacts"])
+let sharedEventStoreBox = EventKitStoreBox()
+let sharedContactStoreBox = ContactStoreBox()
+let googleKeychainService = "me.longbiaochen.smart-shadow.google-oauth"
 
 enum AppError: Error, CustomStringConvertible {
     case usage(String)
@@ -39,6 +46,38 @@ struct Decision: Codable {
     let action: String
     let reason: String
     let confidence: String
+    let projectionTarget: String?
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case priority
+        case risk
+        case needsReview
+        case action
+        case reason
+        case confidence
+        case projectionTarget = "projection_target"
+    }
+
+    init(
+        domain: String,
+        priority: String,
+        risk: String,
+        needsReview: Bool,
+        action: String,
+        reason: String,
+        confidence: String,
+        projectionTarget: String? = nil
+    ) {
+        self.domain = domain
+        self.priority = priority
+        self.risk = risk
+        self.needsReview = needsReview
+        self.action = action
+        self.reason = reason
+        self.confidence = confidence
+        self.projectionTarget = projectionTarget
+    }
 }
 
 struct ActionResult {
@@ -52,6 +91,8 @@ struct ProjectionRecord {
     let canonicalKey: String
     let reminderExternalID: String?
     let calendarExternalID: String?
+    let larkTaskGUID: String?
+    let larkTaskURL: String?
 }
 
 struct RuleRegistry: Codable {
@@ -109,6 +150,7 @@ struct AppConfig {
     let pollSeconds: UInt32
     let remindersEnabled: Bool
     let domainLists: [String: String]
+    let calendarDomainCalendars: [String: String]
     let autoCreateReviewReminders: Bool
     let autoArchiveLowValue: Bool
 
@@ -153,6 +195,14 @@ final class EventKitRequestResult: @unchecked Sendable {
         defer { lock.unlock() }
         return errorValue
     }
+}
+
+final class EventKitStoreBox: @unchecked Sendable {
+    let store = EKEventStore()
+}
+
+final class ContactStoreBox: @unchecked Sendable {
+    let store = CNContactStore()
 }
 
 final class ReminderFetchResult: @unchecked Sendable {
@@ -220,6 +270,19 @@ func run(_ originalArguments: [String]) throws {
         printJSON(try requestEventKitAccess(target: target))
     case "eventkit-list", "list-eventkit":
         try listCalendarsAndReminderLists()
+    case "reminders-plan-quadrants":
+        let config = try loadConfig(configPath)
+        printJSON(try remindersPlanQuadrants(config: config, arguments: rest))
+    case "reminders-db-doctor":
+        printJSON(try remindersDBDoctor(arguments: rest))
+    case "contacts-status":
+        printJSON(contactsStatus())
+    case "contacts-request-access", "request-contacts-access":
+        printJSON(try requestContactsAccess())
+    case "google-auth":
+        let config = try loadConfig(configPath)
+        let subcommand = rest.first ?? "status"
+        printJSON(try googleAuthCommand(config, subcommand: subcommand, arguments: Array(rest.dropFirst())))
     case "plan-sample":
         let input = try parseProjectionInput(rest)
         printJSON(planProjection(input))
@@ -238,6 +301,16 @@ func run(_ originalArguments: [String]) throws {
         let config = try loadConfig(configPath)
         let registry = try loadRuleRegistry(config.rulesFile)
         printJSON(["status": "ok", "version": registry.version, "rule_count": registry.rules.count])
+    case "project-mail-decision":
+        let config = try loadConfig(configPath)
+        let input = optionValue(rest, "--input") ?? ""
+        let dryRun = rest.contains("--dry-run")
+        let noReminders = rest.contains("--no-reminders")
+        printJSON(try projectMailDecision(config, inputPath: input, dryRun: dryRun, noReminders: noReminders))
+    case "shadowd":
+        let config = try loadConfig(configPath)
+        try ensureRuntime(config)
+        printJSON(try handleShadowDCommand(config, arguments: rest))
     case "run-once":
         let config = try loadConfig(configPath)
         let noReminders = rest.contains("--no-reminders")
@@ -324,7 +397,14 @@ func run(_ originalArguments: [String]) throws {
         try ensureRuntime(config)
         try appendAudit(config, ["type": "daemon_started", "poll_seconds": config.pollSeconds])
         while true {
-            _ = try runOnce(config, dryRun: false, noReminders: false)
+            do {
+                let daemonNoReminders = !isEventKitAuthorized(EKEventStore.authorizationStatus(for: .reminder), for: .reminder)
+                _ = try runOnce(config, dryRun: false, noReminders: daemonNoReminders)
+            } catch {
+                try? writeDaemonErrorReport(config, error: error)
+                try? appendAudit(config, ["type": "daemon_run_error", "error": "\(error)"])
+                fputs("smart-shadow: daemon run failed: \(error)\n", stderr)
+            }
             sleep(config.pollSeconds)
         }
     case "install-launchd":
@@ -359,12 +439,12 @@ func printUsage() {
     print("""
     smart-shadow [--config PATH] init
     smart-shadow [--config PATH] run-once [--dry-run] [--no-reminders]
-    smart-shadow [--config PATH] accept-source file_metadata|lark_daily_context|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary|apple_mail_app [--limit N]
+    smart-shadow [--config PATH] accept-source file_metadata|lark_daily_context|lark_calendar_events|lark_tasks|google_calendar_events|google_tasks|google_contacts|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary [--limit N]
     smart-shadow [--config PATH] sources
     smart-shadow [--config PATH] source-doctor
     smart-shadow [--config PATH] service-status
-    smart-shadow [--config PATH] enable-source file_metadata|lark_daily_context|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary|apple_mail_app [--force]
-    smart-shadow [--config PATH] disable-source file_metadata|lark_daily_context|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary|apple_mail_app
+    smart-shadow [--config PATH] enable-source file_metadata|lark_daily_context|lark_calendar_events|lark_tasks|google_calendar_events|google_tasks|google_contacts|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary [--force]
+    smart-shadow [--config PATH] disable-source file_metadata|lark_daily_context|lark_calendar_events|lark_tasks|google_calendar_events|google_tasks|google_contacts|chrome_bookmarks|apple_reminders_inbox|apple_mail_summary
     smart-shadow [--config PATH] daemon
     smart-shadow [--config PATH] health
     smart-shadow [--config PATH] reviews [--limit N]
@@ -374,10 +454,17 @@ func printUsage() {
     smart-shadow [--config PATH] record-rule-feedback RULE_ID accepted|adjusted|retired|rejected --note TEXT [--evidence PATH] [--source TEXT]
     smart-shadow [--config PATH] rules
     smart-shadow [--config PATH] validate-rules
+    smart-shadow [--config PATH] project-mail-decision --input PATH [--dry-run] [--no-reminders]
+    smart-shadow [--config PATH] shadowd once|run|inspect-issue [--dry-run] [--fixture PATH]
     smart-shadow [--config PATH] sample-event [--sample PATH]
+    smart-shadow [--config PATH] google-auth login|status|logout
     smart-shadow eventkit-status
     smart-shadow eventkit-request-access [calendar|reminders|all]
     smart-shadow eventkit-list
+    smart-shadow [--config PATH] reminders-plan-quadrants --dry-run
+    smart-shadow reminders-db-doctor [--store-root PATH]
+    smart-shadow contacts-status
+    smart-shadow contacts-request-access
     smart-shadow plan-sample [--title TEXT] [--domain work|money|health|relationship] [--due YYYY-MM-DD] [--start ISO8601] [--end ISO8601] [--priority low|medium|high] [--flagged true|false] [--review true|false] [--notes TEXT]
     smart-shadow [--config PATH] install-launchd
     smart-shadow [--config PATH] start
@@ -407,6 +494,7 @@ func loadConfig(_ path: String) throws -> AppConfig {
     let runtimeRoot = absolutePath(raw["runtime_root"] as? String ?? "var", base: projectRoot)
     let sources = raw["sources"] as? [String: Any] ?? [:]
     let reminders = raw["reminders"] as? [String: Any] ?? [:]
+    let calendars = raw["calendars"] as? [String: Any] ?? [:]
     let actions = raw["actions"] as? [String: Any] ?? [:]
     return AppConfig(
         raw: raw,
@@ -421,6 +509,7 @@ func loadConfig(_ path: String) throws -> AppConfig {
         pollSeconds: UInt32(raw["poll_seconds"] as? Int ?? 10),
         remindersEnabled: reminders["enabled"] as? Bool ?? true,
         domainLists: reminders["domain_lists"] as? [String: String] ?? [:],
+        calendarDomainCalendars: calendars["domain_calendars"] as? [String: String] ?? [:],
         autoCreateReviewReminders: actions["auto_create_review_reminders"] as? Bool ?? true,
         autoArchiveLowValue: actions["auto_archive_low_value"] as? Bool ?? true
     )
@@ -438,6 +527,220 @@ func absolutePath(_ rawPath: String, base: String) -> String {
 
 func configuredPath(_ rawPath: String, config: AppConfig) -> String {
     absolutePath(rawPath, base: config.projectRoot)
+}
+
+let reminderQuadrants = ["IMPORTANT", "URGENT", "DOING", "TODO"]
+
+func remindersPlanQuadrants(config: AppConfig, arguments: [String]) throws -> [String: Any] {
+    guard arguments.contains("--dry-run") else {
+        throw AppError.usage("reminders-plan-quadrants is read-only and requires --dry-run.")
+    }
+    try requireEventKitAuthorization(for: .reminder, operation: "reminders-plan-quadrants")
+    let store = sharedEventStoreBox.store
+    let configuredDomains = ["money", "health", "relationship", "work"]
+    let configuredLists = configuredDomains.map { domain in
+        (domain: domain, listName: config.domainLists[domain] ?? domain.uppercased())
+    }
+    let calendars = store.calendars(for: .reminder)
+    var outputLists: [[String: Any]] = []
+    var warnings: [String] = [
+        "This command does not create, rename, or move Reminders sections.",
+        "Quadrants are suggestions derived only from public EventKit fields."
+    ]
+    for configured in configuredLists {
+        guard let calendar = calendars.first(where: { $0.title == configured.listName }) else {
+            warnings.append("Reminder list not found: \(configured.listName)")
+            outputLists.append([
+                "domain": configured.domain,
+                "list": configured.listName,
+                "found": false,
+                "item_count": 0,
+                "counts": Dictionary(uniqueKeysWithValues: reminderQuadrants.map { ($0, 0) }),
+                "items": []
+            ])
+            continue
+        }
+        let reminders = try fetchIncompleteReminders(store: store, calendars: [calendar])
+        let planned = reminders.map { reminderQuadrantPlan($0, listName: configured.listName, domain: configured.domain) }
+        var counts = Dictionary(uniqueKeysWithValues: reminderQuadrants.map { ($0, 0) })
+        for item in planned {
+            let quadrant = item["quadrant"] as? String ?? "TODO"
+            counts[quadrant, default: 0] += 1
+        }
+        outputLists.append([
+            "domain": configured.domain,
+            "list": configured.listName,
+            "found": true,
+            "item_count": planned.count,
+            "counts": counts,
+            "items": planned
+        ])
+    }
+    return [
+        "status": "ok",
+        "mode": "dry_run",
+        "generated_at": nowISO(),
+        "policy": [
+            "lists": "life_domains",
+            "sections": reminderQuadrants,
+            "section_write_path": "Reminders App UI or supervised Accessibility only",
+            "eventkit_mutates_sections": false
+        ],
+        "lists": outputLists,
+        "warnings": warnings
+    ] as [String: Any]
+}
+
+func fetchIncompleteReminders(store: EKEventStore, calendars: [EKCalendar]) throws -> [EKReminder] {
+    let fetch = ReminderFetchResult()
+    let semaphore = DispatchSemaphore(value: 0)
+    let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: calendars)
+    store.fetchReminders(matching: predicate) { reminders in
+        fetch.complete(reminders: reminders, error: nil)
+        semaphore.signal()
+    }
+    guard semaphore.wait(timeout: .now() + 30) == .success else {
+        throw AppError.runtime("Timed out fetching Reminders through EventKit.")
+    }
+    if let error = fetch.error {
+        throw AppError.runtime("Failed to fetch Reminders through EventKit: \(error.localizedDescription)")
+    }
+    return fetch.reminders.sorted {
+        let leftDate = reminderPlanningDate($0) ?? .distantFuture
+        let rightDate = reminderPlanningDate($1) ?? .distantFuture
+        if leftDate != rightDate { return leftDate < rightDate }
+        return ($0.title ?? "") < ($1.title ?? "")
+    }
+}
+
+func reminderQuadrantPlan(_ reminder: EKReminder, listName: String, domain: String) -> [String: Any] {
+    let now = Date()
+    let due = reminder.dueDateComponents?.date
+    let remind = reminder.alarms?.compactMap { $0.absoluteDate }.sorted().first
+    let planningDate = [due, remind].compactMap { $0 }.min()
+    let priority = reminder.priority
+    var quadrant = "TODO"
+    var confidence = "low"
+    var reasons: [String] = []
+    if let planningDate, planningDate <= endOfToday(from: now) {
+        quadrant = "URGENT"
+        confidence = planningDate <= now ? "high" : "medium"
+        reasons.append(planningDate <= now ? "due_or_reminder_elapsed" : "due_or_reminder_today")
+    } else if (1...4).contains(priority) {
+        quadrant = "IMPORTANT"
+        confidence = "medium"
+        reasons.append("high_priority")
+    } else if priority == 5 {
+        quadrant = "DOING"
+        confidence = "low"
+        reasons.append("medium_priority")
+    } else {
+        reasons.append("default_backlog")
+    }
+    return [
+        "domain": domain,
+        "list": listName,
+        "external_id": "x-apple-reminder://\(reminder.calendarItemIdentifier)",
+        "title": reminder.title ?? "",
+        "priority": priority,
+        "due": due.map(isoString) ?? NSNull(),
+        "remind": remind.map(isoString) ?? NSNull(),
+        "quadrant": quadrant,
+        "confidence": confidence,
+        "reasons": reasons
+    ]
+}
+
+func reminderPlanningDate(_ reminder: EKReminder) -> Date? {
+    [reminder.dueDateComponents?.date, reminder.alarms?.compactMap { $0.absoluteDate }.sorted().first]
+        .compactMap { $0 }
+        .min()
+}
+
+func endOfToday(from date: Date) -> Date {
+    let calendar = Calendar.current
+    return calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+}
+
+func remindersDBDoctor(arguments: [String]) throws -> [String: Any] {
+    let defaultRoot = "\(NSHomeDirectory())/Library/Group Containers/group.com.apple.reminders/Container_v1/Stores"
+    let storeRoot = absolutePath(optionValue(arguments, "--store-root") ?? defaultRoot, base: FileManager.default.currentDirectoryPath)
+    let urls = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: storeRoot), includingPropertiesForKeys: nil)
+        .filter { $0.pathExtension == "sqlite" }
+        .sorted { $0.path < $1.path }
+    let databases = try urls.map { try inspectReminderDatabase(path: $0.path) }
+    let totals = databases.reduce(into: ["databases": databases.count, "sections": 0, "lists": 0, "reminders": 0]) { totals, db in
+        let counts = db["row_counts"] as? [String: Int] ?? [:]
+        totals["sections", default: 0] += counts["ZREMCDBASESECTION"] ?? 0
+        totals["lists", default: 0] += counts["ZREMCDBASELIST"] ?? 0
+        totals["reminders", default: 0] += counts["ZREMCDREMINDER"] ?? 0
+    }
+    return [
+        "status": "ok",
+        "mode": "read_only",
+        "store_root": storeRoot,
+        "write_api": false,
+        "databases": databases,
+        "totals": totals,
+        "warnings": [
+            "This command opens SQLite databases with SQLITE_OPEN_READONLY.",
+            "Private Reminders tables are diagnostic only and must not be used for production writes."
+        ]
+    ] as [String: Any]
+}
+
+func inspectReminderDatabase(path: String) throws -> [String: Any] {
+    var db: OpaquePointer?
+    guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+        let message = db.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "unable to open database"
+        sqlite3_close(db)
+        throw AppError.runtime("Unable to open Reminders database read-only: \(path): \(message)")
+    }
+    defer { sqlite3_close(db) }
+    let tables = try sqliteStringRows(db, "select name from sqlite_master where type='table' order by name")
+    let interestingTables = ["ZREMCDBASESECTION", "ZREMCDBASELIST", "ZREMCDREMINDER"]
+    var counts: [String: Int] = [:]
+    for table in interestingTables where tables.contains(table) {
+        counts[table] = try sqliteScalarInt(db, "select count(*) from \(table)")
+    }
+    return [
+        "path": path,
+        "read_only": true,
+        "has_section_table": tables.contains("ZREMCDBASESECTION"),
+        "has_list_table": tables.contains("ZREMCDBASELIST"),
+        "has_reminder_table": tables.contains("ZREMCDREMINDER"),
+        "row_counts": counts,
+        "interesting_tables": tables.filter { $0.contains("SECTION") || $0.contains("LIST") || $0.contains("REMINDER") }.sorted()
+    ] as [String: Any]
+}
+
+func sqliteStringRows(_ db: OpaquePointer?, _ sql: String) throws -> [String] {
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+        throw AppError.runtime(sqliteReadOnlyError(db))
+    }
+    defer { sqlite3_finalize(statement) }
+    var rows: [String] = []
+    while sqlite3_step(statement) == SQLITE_ROW {
+        if let text = sqlite3_column_text(statement, 0) {
+            rows.append(String(cString: text))
+        }
+    }
+    return rows
+}
+
+func sqliteScalarInt(_ db: OpaquePointer?, _ sql: String) throws -> Int {
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+        throw AppError.runtime(sqliteReadOnlyError(db))
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW else { return 0 }
+    return Int(sqlite3_column_int64(statement, 0))
+}
+
+func sqliteReadOnlyError(_ db: OpaquePointer?) -> String {
+    db.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "unknown SQLite read-only error"
 }
 
 func ensureRuntime(_ config: AppConfig) throws {
@@ -462,7 +765,7 @@ func validate(_ registry: RuleRegistry) throws {
         if !["global", "source"].contains(rule.scope) { throw AppError.runtime("Invalid scope for \(rule.ruleID)") }
         if !["low", "normal", "high"].contains(rule.priority) { throw AppError.runtime("Invalid priority for \(rule.ruleID)") }
         if !["low", "medium", "high"].contains(rule.risk) { throw AppError.runtime("Invalid risk for \(rule.ruleID)") }
-        if !["record_only", "archive_low_value", "create_review_reminder"].contains(rule.action) { throw AppError.runtime("Invalid action for \(rule.ruleID)") }
+        if !["record_only", "archive_low_value", "create_review_reminder", "sync_projection"].contains(rule.action) { throw AppError.runtime("Invalid action for \(rule.ruleID)") }
         if rule.scope == "source", (rule.sources ?? []).isEmpty { throw AppError.runtime("Source rule missing sources: \(rule.ruleID)") }
     }
 }
@@ -490,7 +793,23 @@ func inferDomain(_ signal: Signal, _ registry: RuleRegistry) -> String {
 func decide(_ signal: Signal, _ registry: RuleRegistry) -> Decision {
     let text = "\(signal.title)\n\(signal.body)\n\(signal.kind)".lowercased()
     let domain = inferDomain(signal, registry)
+    for rule in registry.rules where rule.ruleID == "safety.high_risk_boundary" {
+        if rule.triggers.contains(where: { text.contains($0.lowercased()) }) {
+            return Decision(
+                domain: rule.domain ?? domain,
+                priority: rule.priority,
+                risk: rule.risk,
+                needsReview: rule.needsReview,
+                action: rule.action,
+                reason: "\(rule.ruleID): \(rule.rationale)",
+                confidence: rule.confidence
+            )
+        }
+    }
     for rule in registry.rules {
+        if rule.ruleID == "safety.high_risk_boundary" {
+            continue
+        }
         if let sources = rule.sources, !sources.isEmpty, !sources.contains(signal.source) {
             continue
         }
@@ -509,6 +828,23 @@ func decide(_ signal: Signal, _ registry: RuleRegistry) -> Decision {
     return Decision(domain: domain, priority: "normal", risk: "low", needsReview: false, action: "record_only", reason: "fallback.record_only: 普通低风险信号，先记录审计，等待更多上下文。", confidence: "low")
 }
 
+func mailSender(_ signal: Signal) -> String {
+    for key in ["sender", "from"] {
+        if let value = signal.metadata[key] as? String {
+            return normalizeMailIdentity(value)
+        }
+    }
+    return normalizeMailIdentity(signal.body.components(separatedBy: .newlines).first(where: { $0.hasPrefix("发件人:") }) ?? "")
+}
+
+func normalizeMailIdentity(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let start = trimmed.firstIndex(of: "<"), let end = trimmed[start...].firstIndex(of: ">") {
+        return String(trimmed[trimmed.index(after: start)..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    return trimmed.replacingOccurrences(of: "发件人:", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 func runOnce(_ config: AppConfig, dryRun: Bool, noReminders: Bool) throws -> [String: Any] {
     try ensureRuntime(config)
     let state = try StateStore(path: config.dbPath)
@@ -517,7 +853,18 @@ func runOnce(_ config: AppConfig, dryRun: Bool, noReminders: Bool) throws -> [St
     var processed: [[String: Any]] = []
     var errors: [[String: Any]] = []
 
-    for signal in try collectEnabledSources(config) {
+    for source in googleSyncSources.sorted() where config.sourceConfig(source)["enabled"] as? Bool == true {
+        do {
+            processed.append(try runGoogleSyncSource(config: config, state: state, source: source, dryRun: dryRun))
+        } catch {
+            errors.append(["source": source, "error": "\(error)"])
+            try? appendAudit(config, ["type": "google_sync_error", "source": source, "error": "\(error)"])
+        }
+    }
+
+    let collected = collectEnabledSourceResults(config)
+    errors.append(contentsOf: collected.errors)
+    for signal in collected.signals {
         do {
             let result = try processSignal(config, state: state, registry: registry, signal: signal, dryRun: dryRun, noReminders: noReminders)
             processed.append(result)
@@ -557,6 +904,42 @@ func runOnce(_ config: AppConfig, dryRun: Bool, noReminders: Bool) throws -> [St
     return output
 }
 
+func writeDaemonErrorReport(_ config: AppConfig, error: Error) throws {
+    try ensureRuntime(config)
+    let report: [String: Any] = [
+        "timestamp": nowISO(),
+        "processed_count": 0,
+        "error_count": 1,
+        "processed": [],
+        "errors": [["source": "daemon", "error": "\(error)"]]
+    ]
+    let reportPath = "\(config.reports)/run-\(Int(Date().timeIntervalSince1970)).json"
+    try writeJSON(report, to: reportPath)
+}
+
+func collectEnabledSourceResults(_ config: AppConfig) -> (signals: [Signal], errors: [[String: Any]]) {
+    var signals: [Signal] = []
+    var errors: [[String: Any]] = []
+    let collectors: [(name: String, collect: () throws -> [Signal])] = [
+        ("file_metadata", { try collectFileMetadata(config, limit: nil) }),
+        ("lark_daily_context", { try collectLarkDailyContext(config) }),
+        ("lark_calendar_events", { try collectLarkCalendarEvents(config, limit: nil) }),
+        ("lark_tasks", { try collectLarkTasks(config, limit: nil) }),
+        ("chrome_bookmarks", { try collectChromeBookmarks(config, limit: nil) }),
+        ("apple_reminders_inbox", { try collectAppleRemindersInbox(config, limit: nil) }),
+        ("apple_mail_summary", { try collectAppleMailSummary(config, limit: nil) })
+    ]
+    for collector in collectors where config.sourceConfig(collector.name)["enabled"] as? Bool == true {
+        do {
+            signals.append(contentsOf: try collector.collect())
+        } catch {
+            errors.append(["source": collector.name, "error": "\(error)"])
+            try? appendAudit(config, ["type": "source_collection_error", "source": collector.name, "error": "\(error)"])
+        }
+    }
+    return (signals, errors)
+}
+
 func collectEnabledSources(_ config: AppConfig) throws -> [Signal] {
     var signals: [Signal] = []
     let fileConfig = config.sourceConfig("file_metadata")
@@ -566,6 +949,14 @@ func collectEnabledSources(_ config: AppConfig) throws -> [Signal] {
     let larkConfig = config.sourceConfig("lark_daily_context")
     if larkConfig["enabled"] as? Bool == true {
         signals.append(contentsOf: try collectLarkDailyContext(config))
+    }
+    let larkCalendarConfig = config.sourceConfig("lark_calendar_events")
+    if larkCalendarConfig["enabled"] as? Bool == true {
+        signals.append(contentsOf: try collectLarkCalendarEvents(config, limit: nil))
+    }
+    let larkTasksConfig = config.sourceConfig("lark_tasks")
+    if larkTasksConfig["enabled"] as? Bool == true {
+        signals.append(contentsOf: try collectLarkTasks(config, limit: nil))
     }
     let bookmarksConfig = config.sourceConfig("chrome_bookmarks")
     if bookmarksConfig["enabled"] as? Bool == true {
@@ -578,10 +969,6 @@ func collectEnabledSources(_ config: AppConfig) throws -> [Signal] {
     let mailConfig = config.sourceConfig("apple_mail_summary")
     if mailConfig["enabled"] as? Bool == true {
         signals.append(contentsOf: try collectAppleMailSummary(config, limit: nil))
-    }
-    let mailAppConfig = config.sourceConfig("apple_mail_app")
-    if mailAppConfig["enabled"] as? Bool == true {
-        signals.append(contentsOf: try collectAppleMailApp(config, limit: nil))
     }
     return signals
 }
@@ -620,22 +1007,58 @@ func sourceDoctorItem(_ config: AppConfig, name: String) -> [String: Any] {
     } else if acceptanceStatus != "ok" {
         blockers.append("acceptance_not_ok")
     }
-    blockers.append(contentsOf: authorizationBlockersForSource(name))
+    blockers.append(contentsOf: authorizationBlockersForSource(config, name: name))
     return [
         "name": name,
         "enabled": enabled,
         "acceptance_report": report ?? NSNull(),
         "acceptance_status": acceptanceStatus ?? NSNull(),
         "ready_to_enable": blockers.isEmpty,
-        "blockers": blockers
+        "blockers": blockers,
+        "suggested_command": suggestedCommandForSourceBlocker(["name": name, "blockers": blockers])
     ] as [String: Any]
 }
 
-func authorizationBlockersForSource(_ name: String) -> [String] {
+func authorizationBlockersForSource(_ config: AppConfig, name: String) -> [String] {
     switch name {
     case "apple_reminders_inbox":
         let status = EKEventStore.authorizationStatus(for: .reminder)
         return isEventKitAuthorized(status, for: .reminder) ? [] : ["eventkit_reminders_\(authorizationDescription(status))"]
+    case "lark_calendar_events":
+        var blockers = larkCLIBlockers()
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if !isEventKitAuthorized(status, for: .event) {
+            blockers.append("eventkit_calendar_\(authorizationDescription(status))")
+        }
+        return blockers
+    case "lark_tasks":
+        var blockers = larkCLIBlockers()
+        let status = EKEventStore.authorizationStatus(for: .reminder)
+        if !isEventKitAuthorized(status, for: .reminder) {
+            blockers.append("eventkit_reminders_\(authorizationDescription(status))")
+        }
+        return blockers
+    case "google_calendar_events":
+        var blockers = googleAuthBlockers(config: config, source: name)
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if !isEventKitAuthorized(status, for: .event) {
+            blockers.append("eventkit_calendar_\(authorizationDescription(status))")
+        }
+        return blockers
+    case "google_tasks":
+        var blockers = googleAuthBlockers(config: config, source: name)
+        let status = EKEventStore.authorizationStatus(for: .reminder)
+        if !isEventKitAuthorized(status, for: .reminder) {
+            blockers.append("eventkit_reminders_\(authorizationDescription(status))")
+        }
+        return blockers
+    case "google_contacts":
+        var blockers = googleAuthBlockers(config: config, source: name)
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        if !isContactsAuthorized(status) {
+            blockers.append("contacts_\(contactsAuthorizationDescription(status))")
+        }
+        return blockers
     default:
         return []
     }
@@ -687,6 +1110,17 @@ func serviceAttention(launchd: [String: Any], runReport: Any, auditEvent: Any, s
             "suggested_command": "bin/smart-shadow service-status"
         ])
     }
+    if let run = runReport as? [String: Any],
+       let errorCount = run["error_count"] as? Int,
+       errorCount > 0 {
+        items.append([
+            "code": "last_run_errors",
+            "message": "Latest run report contains processing errors.",
+            "error_count": errorCount,
+            "report_path": run["path"] ?? NSNull(),
+            "suggested_command": "bin/smart-shadow report"
+        ])
+    }
     if let audit = auditEvent as? [String: Any],
        audit["report_path"] is String,
        audit["report_exists"] as? Bool == false {
@@ -699,7 +1133,7 @@ func serviceAttention(launchd: [String: Any], runReport: Any, auditEvent: Any, s
     }
     if let sources = sourceState["sources"] as? [[String: Any]] {
         for source in sources {
-            if source["ready_to_enable"] as? Bool == false {
+            if source["enabled"] as? Bool == true, source["ready_to_enable"] as? Bool == false {
                 items.append([
                     "code": "source_blocked",
                     "message": "A sensing source is not ready to enable.",
@@ -719,6 +1153,18 @@ func suggestedCommandForSourceBlocker(_ source: [String: Any]) -> String {
     if blockers.contains(where: { $0.hasPrefix("eventkit_reminders_") }) {
         return "bin/smart-shadow eventkit-request-access reminders"
     }
+    if blockers.contains(where: { $0.hasPrefix("eventkit_calendar_") }) {
+        return "bin/smart-shadow eventkit-request-access calendar"
+    }
+    if blockers.contains(where: { $0.hasPrefix("contacts_") }) {
+        return "bin/smart-shadow contacts-request-access"
+    }
+    if blockers.contains(where: { $0.hasPrefix("google_auth_") || $0 == "google_oauth_client_id_missing" }) {
+        return "bin/smart-shadow google-auth login"
+    }
+    if blockers.contains("lark_cli_missing") {
+        return "install lark-cli and run lark-cli auth login --domain calendar/task as needed"
+    }
     if blockers.contains("missing_acceptance_report") {
         return "bin/smart-shadow accept-source \(name)"
     }
@@ -727,7 +1173,10 @@ func suggestedCommandForSourceBlocker(_ source: [String: Any]) -> String {
 
 func latestRunReport(_ config: AppConfig) -> Any {
     let files = (try? FileManager.default.contentsOfDirectory(atPath: config.reports)) ?? []
-    guard let newest = files.filter({ $0.hasPrefix("run-") && $0.hasSuffix(".json") }).sorted().last else {
+    let candidates = files.filter { $0.hasPrefix("run-") && $0.hasSuffix(".json") }
+    guard let newest = candidates.max(by: { left, right in
+        runReportSortDate(config: config, fileName: left) < runReportSortDate(config: config, fileName: right)
+    }) else {
         return NSNull()
     }
     let path = "\(config.reports)/\(newest)"
@@ -749,6 +1198,18 @@ func latestRunReport(_ config: AppConfig) -> Any {
         }
     }
     return output
+}
+
+func runReportSortDate(config: AppConfig, fileName: String) -> Date {
+    let path = "\(config.reports)/\(fileName)"
+    if let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+       let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let timestamp = payload["timestamp"] as? String,
+       let date = parseDate(timestamp) {
+        return date
+    }
+    let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+    return attributes?[.modificationDate] as? Date ?? .distantPast
 }
 
 func latestAuditEvent(_ config: AppConfig) -> Any {
@@ -796,7 +1257,7 @@ func updateSourceEnabled(_ config: AppConfig, name: String, enabled: Bool, force
         }
     }
     if enabled {
-        try requireAuthorizationForSource(name)
+        try requireAuthorizationForSource(config, name: name)
     }
     var raw = config.raw
     guard var sources = raw["sources"] as? [String: Any],
@@ -846,10 +1307,19 @@ func latestAcceptanceReport(_ config: AppConfig, source: String) -> String? {
     return "\(config.reports)/\(newest)"
 }
 
-func requireAuthorizationForSource(_ name: String) throws {
+func requireAuthorizationForSource(_ config: AppConfig, name: String) throws {
     switch name {
     case "apple_reminders_inbox":
         try requireEventKitAuthorization(for: .reminder, operation: "enable Apple Reminders Inbox sensing")
+    case "google_calendar_events":
+        try requireGoogleAuthorization(config: config, operation: "enable Google Calendar sync")
+        try requireEventKitAuthorization(for: .event, operation: "enable Google Calendar sync")
+    case "google_tasks":
+        try requireGoogleAuthorization(config: config, operation: "enable Google Tasks sync")
+        try requireEventKitAuthorization(for: .reminder, operation: "enable Google Tasks sync")
+    case "google_contacts":
+        try requireGoogleAuthorization(config: config, operation: "enable Google Contacts sync")
+        try requireContactsAuthorization(operation: "enable Google Contacts sync")
     default:
         return
     }
@@ -876,14 +1346,22 @@ func collectSource(_ config: AppConfig, name: String, limit: Int?) throws -> [Si
         return try collectFileMetadata(config, limit: limit)
     case "lark_daily_context":
         return try collectLarkDailyContext(config)
+    case "lark_calendar_events":
+        return try collectLarkCalendarEvents(config, limit: limit)
+    case "lark_tasks":
+        return try collectLarkTasks(config, limit: limit)
+    case "google_calendar_events":
+        return try collectGoogleCalendarPreview(config, limit: limit)
+    case "google_tasks":
+        return try collectGoogleTasksPreview(config, limit: limit)
+    case "google_contacts":
+        return try collectGoogleContactsPreview(config, limit: limit)
     case "chrome_bookmarks":
         return try collectChromeBookmarks(config, limit: limit)
     case "apple_reminders_inbox":
         return try collectAppleRemindersInbox(config, limit: limit)
     case "apple_mail_summary":
         return try collectAppleMailSummary(config, limit: limit)
-    case "apple_mail_app":
-        return try collectAppleMailApp(config, limit: limit)
     default:
         throw AppError.usage("Unsupported source acceptance target: \(name)")
     }
@@ -894,6 +1372,7 @@ func collectFileMetadata(_ config: AppConfig, limit: Int?) throws -> [Signal] {
     let paths = sourceConfig["paths"] as? [String] ?? []
     let maxItems = limit ?? sourceConfig["max_items"] as? Int ?? 25
     let maxAgeHours = sourceConfig["max_age_hours"] as? Double ?? Double(sourceConfig["max_age_hours"] as? Int ?? 24)
+    let timeout = TimeInterval(sourceConfig["timeout_seconds"] as? Double ?? Double(sourceConfig["timeout_seconds"] as? Int ?? 5))
     let ignoreNames = Set(sourceConfig["ignore_names"] as? [String] ?? [])
     let cutoff = Date().addingTimeInterval(-maxAgeHours * 3600)
     var candidates: [(date: Date, url: URL, size: UInt64)] = []
@@ -904,7 +1383,17 @@ func collectFileMetadata(_ config: AppConfig, limit: Int?) throws -> [Signal] {
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             continue
         }
-        let contents = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey], options: [.skipsHiddenFiles])) ?? []
+        let listing: String
+        do {
+            listing = try runExternalCommand(["find", root.path, "-maxdepth", "1", "-type", "f", "-print"], timeout: timeout)
+        } catch {
+            try? appendAudit(config, ["type": "file_metadata_scan_error", "path": root.path, "error": "\(error)"])
+            continue
+        }
+        let contents = listing
+            .components(separatedBy: .newlines)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { URL(fileURLWithPath: $0) }
         for url in contents {
             if ignoreNames.contains(url.lastPathComponent) || url.lastPathComponent.hasPrefix(".") {
                 continue
@@ -982,6 +1471,240 @@ func collectLarkDailyContext(_ config: AppConfig) throws -> [Signal] {
     return signals
 }
 
+func collectLarkCalendarEvents(_ config: AppConfig, limit: Int?) throws -> [Signal] {
+    let sourceConfig = config.sourceConfig("lark_calendar_events")
+    let timeout = TimeInterval(sourceConfig["timeout_seconds"] as? Double ?? Double(sourceConfig["timeout_seconds"] as? Int ?? 20))
+    let maxItems = limit ?? sourceConfig["max_items"] as? Int ?? 100
+    var records: [[String: Any]] = []
+    for command in try larkCalendarCommands(sourceConfig, timeout: timeout) {
+        let raw = try runExternalCommand(command.argv, timeout: timeout)
+        let parsed = try JSONSerialization.jsonObject(with: Data(raw.utf8))
+        let commandRecords = jsonRecords(parsed).map { record -> [String: Any] in
+            var annotated = record
+            if let sourceCalendarID = command.sourceCalendarID {
+                annotated["source_calendar_id"] = sourceCalendarID
+            }
+            if let sourceCalendarSummary = command.sourceCalendarSummary {
+                annotated["source_calendar_summary"] = sourceCalendarSummary
+            }
+            return annotated
+        }
+        records.append(contentsOf: commandRecords)
+        if records.count >= maxItems {
+            break
+        }
+    }
+
+    return records.prefix(maxItems).compactMap { record in
+        guard let eventID = larkString(record, ["instance_id", "event_id", "id", "uid"]) else {
+            return nil
+        }
+        let title = larkString(record, ["summary", "title", "name"]) ?? "(untitled Lark event)"
+        let start = larkDateString(record, ["start_time", "start", "start_at"])
+        let end = larkDateString(record, ["end_time", "end", "end_at"])
+        let location = larkString(record, ["location", "meeting_room", "room"])
+        let url = larkString(record, ["url", "share_url", "app_link", "applink", "vchat"])
+        let description = larkString(record, ["description", "notes", "content"])
+        let rsvp = larkString(record, ["self_rsvp_status", "rsvp_status"])
+        let sourceCalendarID = larkString(record, ["source_calendar_id"])
+        let organizerCalendarID = larkString(record, ["calendar_id", "organizer_calendar_id"])
+        let sourceCalendarSummary = larkString(record, ["source_calendar_summary"])
+        let sourceID = "\(eventID):\(sha256Prefix(stableJSON(record)))"
+        let body = description ?? ""
+        let canonicalKey = sourceCalendarID.map { "lark:calendar:\($0):\(eventID)" } ?? "lark:calendar:\(eventID)"
+        var metadata: [String: Any] = [
+            "canonical_key": canonicalKey,
+            "lark_event_id": eventID,
+            "readonly_external_command": true,
+            "argv0": "lark-cli",
+            "projection_target": "calendar"
+        ]
+        if let start { metadata["calendar_start"] = start }
+        if let end { metadata["calendar_end"] = end }
+        if let location { metadata["location"] = location }
+        if let url { metadata["url"] = url }
+        if let description { metadata["description"] = description }
+        if let rsvp { metadata["self_rsvp_status"] = rsvp }
+        if let sourceCalendarID { metadata["source_calendar_id"] = sourceCalendarID }
+        if let organizerCalendarID { metadata["organizer_calendar_id"] = organizerCalendarID }
+        if let sourceCalendarSummary {
+            metadata["source_calendar_summary"] = sourceCalendarSummary
+            if let domain = larkCalendarDomain(sourceCalendarSummary, sourceConfig: sourceConfig) {
+                metadata["expected_domain"] = domain
+            }
+        }
+        return Signal(
+            source: "lark_calendar_events",
+            sourceID: sourceID,
+            title: title,
+            body: body,
+            kind: "lark_calendar_event",
+            occurredAt: start ?? nowISO(),
+            metadata: metadata
+        )
+    }
+}
+
+func collectLarkTasks(_ config: AppConfig, limit: Int?) throws -> [Signal] {
+    let sourceConfig = config.sourceConfig("lark_tasks")
+    let timeout = TimeInterval(sourceConfig["timeout_seconds"] as? Double ?? Double(sourceConfig["timeout_seconds"] as? Int ?? 20))
+    let maxItems = limit ?? sourceConfig["max_items"] as? Int ?? 100
+    let raw = try runExternalCommand(larkTasksArgv(sourceConfig), timeout: timeout)
+    let parsed = try JSONSerialization.jsonObject(with: Data(raw.utf8))
+    let records = jsonRecords(parsed)
+
+    return records.prefix(maxItems).compactMap { record in
+        if larkBool(record, ["completed", "is_completed", "complete"]) == true {
+            return nil
+        }
+        guard let guid = larkString(record, ["guid", "task_guid", "id"]) else {
+            return nil
+        }
+        let title = larkString(record, ["summary", "title", "name", "task_summary"]) ?? "(untitled Lark task)"
+        let due = larkString(record, ["due", "due_time", "due_at", "deadline"])
+        let start = larkString(record, ["start", "start_time", "start_at"])
+        let end = larkString(record, ["end", "end_time", "end_at"])
+        let url = larkString(record, ["url", "app_link", "applink"])
+        let description = larkString(record, ["description", "notes", "content"])
+        let larkPriority = larkString(record, ["priority", "priority_label"])
+        let sourceID = "\(guid):\(sha256Prefix(stableJSON(record)))"
+        let body = [
+            "标题: \(title)",
+            due.map { "截止: \($0)" },
+            start.map { "开始: \($0)" },
+            url.map { "链接: \($0)" },
+            description.map { "说明: \($0)" }
+        ].compactMap { $0 }.joined(separator: "\n")
+        var metadata: [String: Any] = [
+            "canonical_key": "lark:task:\(guid)",
+            "lark_task_guid": guid,
+            "readonly_external_command": true,
+            "argv0": "lark-cli",
+            "projection_target": "reminder"
+        ]
+        if let due { metadata["due_date"] = due }
+        if let start {
+            metadata["start_at"] = start
+        }
+        if let end { metadata["end_at"] = end }
+        if let url { metadata["url"] = url }
+        if let description { metadata["description"] = description }
+        if let larkPriority { metadata["lark_priority"] = larkPriority }
+        return Signal(
+            source: "lark_tasks",
+            sourceID: sourceID,
+            title: "飞书任务: \(title)",
+            body: body,
+            kind: "lark_task",
+            occurredAt: due ?? start ?? nowISO(),
+            metadata: metadata
+        )
+    }
+}
+
+struct LarkCalendarReadCommand {
+    let argv: [String]
+    let sourceCalendarID: String?
+    let sourceCalendarSummary: String?
+}
+
+func larkCalendarCommands(_ sourceConfig: [String: Any], timeout: TimeInterval) throws -> [LarkCalendarReadCommand] {
+    let ranges = larkCalendarWindowRanges(sourceConfig)
+    var commands: [LarkCalendarReadCommand] = []
+    let extraTargets = try larkExtraCalendarTargets(sourceConfig, timeout: timeout)
+    for target in extraTargets {
+        for range in ranges {
+            commands.append(
+                LarkCalendarReadCommand(
+                    argv: larkCalendarInstanceViewArgv(calendarID: target.id, start: range.start, end: range.end),
+                    sourceCalendarID: target.id,
+                    sourceCalendarSummary: target.summary
+                )
+            )
+        }
+    }
+
+    let argv = sourceConfig["argv"] as? [String] ?? ["lark-cli", "calendar", "+agenda", "--as", "user", "--format", "json"]
+    let primaryCalendarID = sourceConfig["primary_calendar_id"] as? String
+    let primaryCalendarSummary = sourceConfig["primary_calendar_summary"] as? String
+    if argv.contains("--start") || argv.contains("--end") {
+        commands.append(LarkCalendarReadCommand(argv: argv, sourceCalendarID: primaryCalendarID, sourceCalendarSummary: primaryCalendarSummary))
+        return commands
+    }
+    commands.append(contentsOf: ranges.map { range in
+        var command = argv
+        command.append(contentsOf: ["--start", isoString(range.start), "--end", isoString(range.end)])
+        return LarkCalendarReadCommand(argv: command, sourceCalendarID: primaryCalendarID, sourceCalendarSummary: primaryCalendarSummary)
+    })
+    return commands
+}
+
+func larkCalendarDomain(_ sourceCalendarSummary: String, sourceConfig: [String: Any]) -> String? {
+    let domains = sourceConfig["source_calendar_domains"] as? [String: String] ?? [:]
+    guard let rawDomain = domains[sourceCalendarSummary]?.lowercased() else {
+        return nil
+    }
+    let normalized = rawDomain == "network" ? "relationship" : rawDomain
+    return ["money", "health", "relationship", "work"].contains(normalized) ? normalized : nil
+}
+
+func larkCalendarWindowRanges(_ sourceConfig: [String: Any]) -> [(start: Date, end: Date)] {
+    let pastDays = sourceConfig["window_past_days"] as? Int ?? 7
+    let futureDays = sourceConfig["window_future_days"] as? Int ?? 30
+    let chunkDays = max(1, sourceConfig["chunk_days"] as? Int ?? 1)
+    let calendar = Calendar(identifier: .gregorian)
+    let todayStart = calendar.startOfDay(for: Date())
+    let windowStart = calendar.date(byAdding: .day, value: -pastDays, to: todayStart) ?? todayStart
+    let windowEnd = calendar.date(byAdding: .day, value: futureDays + 1, to: todayStart) ?? todayStart
+    var ranges: [(start: Date, end: Date)] = []
+    var cursor = windowStart
+    while cursor < windowEnd {
+        let next = min(calendar.date(byAdding: .day, value: chunkDays, to: cursor) ?? windowEnd, windowEnd)
+        ranges.append((start: cursor, end: next))
+        cursor = next
+    }
+    return ranges
+}
+
+func larkTasksArgv(_ sourceConfig: [String: Any]) -> [String] {
+    sourceConfig["argv"] as? [String] ?? ["lark-cli", "task", "+get-my-tasks", "--as", "user", "--complete=false", "--page-all", "--format", "json"]
+}
+
+func larkExtraCalendarTargets(_ sourceConfig: [String: Any], timeout: TimeInterval) throws -> [(id: String, summary: String)] {
+    var targets: [(id: String, summary: String)] = []
+    if let ids = sourceConfig["extra_calendar_ids"] as? [String] {
+        targets.append(contentsOf: ids.map { (id: $0, summary: $0) })
+    }
+    guard let summaries = sourceConfig["extra_calendar_summaries"] as? [String], !summaries.isEmpty else {
+        return targets
+    }
+
+    let raw = try runExternalCommand(["lark-cli", "calendar", "calendars", "list", "--as", "user", "--format", "json"], timeout: timeout)
+    let parsed = try JSONSerialization.jsonObject(with: Data(raw.utf8))
+    let calendars = jsonRecords(parsed)
+    for summary in summaries {
+        if let calendar = calendars.first(where: { record in
+            larkString(record, ["summary"]) == summary || larkString(record, ["summary_alias"]) == summary
+        }), let id = larkString(calendar, ["calendar_id"]) {
+            targets.append((id: id, summary: summary))
+        } else {
+            throw AppError.runtime("Lark calendar named \(summary) was not found.")
+        }
+    }
+    return targets
+}
+
+func larkCalendarInstanceViewArgv(calendarID: String, start: Date, end: Date) -> [String] {
+    let params: [String: String] = [
+        "calendar_id": calendarID,
+        "start_time": String(Int(start.timeIntervalSince1970)),
+        "end_time": String(Int(end.timeIntervalSince1970))
+    ]
+    let data = try? JSONSerialization.data(withJSONObject: params, options: [.sortedKeys])
+    let paramsJSON = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    return ["lark-cli", "calendar", "events", "instance_view", "--as", "user", "--format", "json", "--params", paramsJSON]
+}
+
 func compactLarkCommandOutput(_ raw: String, label: String, maxItems: Int, maxBodyChars: Int) -> (body: String, count: Int) {
     let parsed = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as Any?
     let records = jsonRecords(parsed)
@@ -1006,7 +1729,7 @@ func jsonRecords(_ value: Any?) -> [[String: Any]] {
     guard let object = value as? [String: Any] else {
         return []
     }
-    for key in ["items", "events", "tasks", "records"] {
+    for key in ["items", "events", "tasks", "records", "calendar_list"] {
         if let items = object[key] as? [[String: Any]] {
             return items
         }
@@ -1020,6 +1743,61 @@ func jsonRecords(_ value: Any?) -> [[String: Any]] {
     return [object]
 }
 
+func stableJSON(_ value: Any) -> String {
+    guard JSONSerialization.isValidJSONObject(value),
+          let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+          let text = String(data: data, encoding: .utf8)
+    else {
+        return String(describing: value)
+    }
+    return text
+}
+
+func larkString(_ record: [String: Any], _ keys: [String]) -> String? {
+    for key in keys {
+        guard let value = record[key], !(value is NSNull) else { continue }
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        } else if let number = value as? NSNumber {
+            return number.stringValue
+        } else if let object = value as? [String: Any] {
+            if let nested = larkString(object, ["datetime", "timestamp", "time", "date_time", "date", "value", "text", "name", "address", "meeting_url"]) {
+                return nested
+            }
+        }
+    }
+    return nil
+}
+
+func larkDateString(_ record: [String: Any], _ keys: [String]) -> String? {
+    guard let raw = larkString(record, keys) else {
+        return nil
+    }
+    if let seconds = TimeInterval(raw), seconds > 1_000_000_000 {
+        return isoString(Date(timeIntervalSince1970: seconds))
+    }
+    return raw
+}
+
+func larkBool(_ record: [String: Any], _ keys: [String]) -> Bool? {
+    for key in keys {
+        guard let value = record[key], !(value is NSNull) else { continue }
+        if let bool = value as? Bool {
+            return bool
+        }
+        if let number = value as? NSNumber {
+            return number.boolValue
+        }
+        if let string = value as? String {
+            let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if ["true", "1", "yes", "completed", "complete"].contains(normalized) { return true }
+            if ["false", "0", "no", "incomplete", "open"].contains(normalized) { return false }
+        }
+    }
+    return nil
+}
+
 func compactRecord(_ record: [String: Any]) -> String {
     let title = record["summary"] ?? record["title"] ?? record["name"] ?? record["task_summary"] ?? record["content"] ?? record["event_id"] ?? record["guid"] ?? "(untitled)"
     var fields = [String(describing: title)]
@@ -1029,6 +1807,21 @@ func compactRecord(_ record: [String: Any]) -> String {
         }
     }
     return fields.joined(separator: " | ")
+}
+
+func larkCLIBlockers() -> [String] {
+    findExecutableInPath("lark-cli") == nil ? ["lark_cli_missing"] : []
+}
+
+func findExecutableInPath(_ name: String) -> String? {
+    let paths = (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+    for path in paths {
+        let candidate = "\(path)/\(name)"
+        if FileManager.default.isExecutableFile(atPath: candidate) {
+            return candidate
+        }
+    }
+    return nil
 }
 
 func runExternalCommand(_ argv: [String], timeout: TimeInterval) throws -> String {
@@ -1156,7 +1949,9 @@ func collectAppleRemindersInbox(_ config: AppConfig, limit: Int?) throws -> [Sig
         fetch.complete(reminders: reminders, error: nil)
         semaphore.signal()
     }
-    semaphore.wait()
+    guard semaphore.wait(timeout: .now() + 30) == .success else {
+        throw AppError.runtime("Timed out fetching Apple Reminders Inbox through EventKit.")
+    }
     if let error = fetch.error {
         throw AppError.runtime("Failed to fetch Apple Reminders Inbox: \(error.localizedDescription)")
     }
@@ -1263,56 +2058,6 @@ func collectAppleMailSummary(_ config: AppConfig, limit: Int?) throws -> [Signal
     }
 }
 
-func collectAppleMailApp(_ config: AppConfig, limit: Int?) throws -> [Signal] {
-    let sourceConfig = config.sourceConfig("apple_mail_app")
-    guard let argv = sourceConfig["reader_argv"] as? [String], !argv.isEmpty else {
-        throw AppError.runtime("apple_mail_app.reader_argv must define a Mail.app reader command.")
-    }
-    let timeout = TimeInterval(sourceConfig["timeout_seconds"] as? Double ?? Double(sourceConfig["timeout_seconds"] as? Int ?? 20))
-    let maxItems = limit ?? sourceConfig["max_items"] as? Int ?? 25
-    let maxBodyChars = sourceConfig["max_body_chars"] as? Int ?? 4000
-    let raw = try runExternalCommand(argv, timeout: timeout)
-    let parsed = try JSONSerialization.jsonObject(with: Data(raw.utf8))
-    let messages = mailSummaryRecords(parsed)
-
-    return messages.prefix(maxItems).enumerated().map { index, message in
-        let subject = stringField(message, ["subject", "title"]) ?? "(no subject)"
-        let sender = stringField(message, ["sender", "from"]) ?? "(unknown sender)"
-        let mailbox = stringField(message, ["mailbox", "folder"]) ?? "unknown"
-        let receivedAt = stringField(message, ["received_at", "date", "occurred_at"]) ?? nowISO()
-        let summary = stringField(message, ["summary", "snippet", "preview"]) ?? ""
-        let bodyText = stringField(message, ["body", "content", "text"])
-        let sourceID = stringField(message, ["source_id", "message_id", "id"]) ?? sha256Prefix("\(sender)\n\(subject)\n\(receivedAt)\n\(index)")
-        let readableBody = bodyText ?? summary
-        let trimmedBody = readableBody.count > maxBodyChars ? String(readableBody.prefix(max(0, maxBodyChars - 12))) + "\n...(已截断)" : readableBody
-        let body = [
-            "发件人: \(sender)",
-            "主题: \(subject)",
-            "邮箱: \(mailbox)",
-            "收信时间: \(receivedAt)",
-            summary.isEmpty ? nil : "摘要: \(summary)",
-            trimmedBody.isEmpty ? nil : "正文: \(trimmedBody)"
-        ].compactMap { $0 }.joined(separator: "\n")
-        return Signal(
-            source: "apple_mail_app",
-            sourceID: sourceID,
-            title: "邮件: \(subject)",
-            body: body,
-            kind: "apple_mail_app_message",
-            occurredAt: receivedAt,
-            metadata: [
-                "sender": sender,
-                "subject": subject,
-                "mailbox": mailbox,
-                "received_at": receivedAt,
-                "mail_app_surface": true,
-                "body_read": bodyText != nil,
-                "canonical_key": "apple_mail:\(sourceID)"
-            ]
-        )
-    }
-}
-
 func mailSummaryRecords(_ value: Any) -> [[String: Any]] {
     if let records = value as? [[String: Any]] {
         return records
@@ -1367,6 +2112,994 @@ func chromeDate(_ value: Any?) -> Date {
     return Date(timeIntervalSince1970: Double(raw) / 1_000_000 - 11_644_473_600)
 }
 
+enum GoogleHTTPError: Error, CustomStringConvertible {
+    case status(Int, String)
+
+    var description: String {
+        switch self {
+        case let .status(code, body):
+            return "Google HTTP \(code): \(body.prefix(240))"
+        }
+    }
+}
+
+struct GoogleToken: Codable {
+    let accessToken: String
+    let refreshToken: String?
+    let expiresAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case expiresAt = "expires_at"
+    }
+}
+
+struct GoogleClient {
+    let config: AppConfig
+
+    func getJSON(path: String, query: [String: String]) throws -> [String: Any] {
+        if let mock = try googleMockPayload(config) {
+            return try googleMockResponse(mock, path: path, query: query)
+        }
+        let token = try googleAccessToken(config)
+        var components = URLComponents(string: "https://www.googleapis.com\(path)")!
+        components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }.sorted { $0.name < $1.name }
+        guard let url = components.url else { throw AppError.runtime("Unable to build Google URL for \(path).") }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let response = try syncHTTPRequest(request)
+        guard (200..<300).contains(response.status) else {
+            throw GoogleHTTPError.status(response.status, response.body)
+        }
+        return try parseJSONObject(response.body)
+    }
+
+    func postForm(path: String, form: [String: String]) throws -> [String: Any] {
+        var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com\(path)")!)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = formURLEncoded(form).data(using: .utf8)
+        let response = try syncHTTPRequest(request)
+        guard (200..<300).contains(response.status) else {
+            throw GoogleHTTPError.status(response.status, response.body)
+        }
+        return try parseJSONObject(response.body)
+    }
+}
+
+func runGoogleSyncSource(config: AppConfig, state: StateStore, source: String, dryRun: Bool) throws -> [String: Any] {
+    switch source {
+    case "google_calendar_events":
+        return try syncGoogleCalendar(config: config, state: state, dryRun: dryRun)
+    case "google_tasks":
+        return try syncGoogleTasks(config: config, state: state, dryRun: dryRun)
+    case "google_contacts":
+        return try syncGoogleContacts(config: config, state: state, dryRun: dryRun)
+    default:
+        throw AppError.runtime("Unsupported Google sync source: \(source)")
+    }
+}
+
+func collectGoogleCalendarPreview(_ config: AppConfig, limit: Int?) throws -> [Signal] {
+    let client = GoogleClient(config: config)
+    let calendarList = try googleCalendarList(config: config, client: client)
+    let maxItems = limit ?? config.sourceConfig("google_calendar_events")["max_items"] as? Int ?? 25
+    var signals: [Signal] = []
+    for calendar in calendarList.prefix(max(1, maxItems)) {
+        let calendarID = stringField(calendar, ["id"]) ?? "primary"
+        let summary = stringField(calendar, ["summary"]) ?? calendarID
+        let events = try googleCalendarEvents(config: config, client: client, calendarID: calendarID, syncToken: nil)
+        for event in events.items.prefix(maxItems - signals.count) {
+            signals.append(googleCalendarSignal(event: event, calendarID: calendarID, calendarSummary: summary))
+        }
+        if signals.count >= maxItems { break }
+    }
+    return signals
+}
+
+func collectGoogleTasksPreview(_ config: AppConfig, limit: Int?) throws -> [Signal] {
+    let client = GoogleClient(config: config)
+    let lists = try googleTaskLists(config: config, client: client)
+    let maxItems = limit ?? config.sourceConfig("google_tasks")["max_items"] as? Int ?? 25
+    var signals: [Signal] = []
+    for list in lists.prefix(max(1, maxItems)) {
+        let listID = stringField(list, ["id"]) ?? "@default"
+        let title = stringField(list, ["title"]) ?? listID
+        let tasks = try googleTasks(config: config, client: client, taskListID: listID)
+        for task in tasks.prefix(maxItems - signals.count) {
+            signals.append(googleTaskSignal(task: task, taskListID: listID, taskListTitle: title))
+        }
+        if signals.count >= maxItems { break }
+    }
+    return signals
+}
+
+func collectGoogleContactsPreview(_ config: AppConfig, limit: Int?) throws -> [Signal] {
+    let client = GoogleClient(config: config)
+    let payload = try googlePeopleConnections(config: config, client: client, syncToken: nil)
+    let people = payload["connections"] as? [[String: Any]] ?? []
+    let maxItems = limit ?? config.sourceConfig("google_contacts")["max_items"] as? Int ?? 25
+    return people.prefix(maxItems).map { googleContactSignal($0) }
+}
+
+func syncGoogleCalendar(config: AppConfig, state: StateStore, dryRun: Bool) throws -> [String: Any] {
+    if !dryRun {
+        try requireGoogleAuthorization(config: config, operation: "sync Google Calendar")
+        try requireEventKitAuthorization(for: .event, operation: "sync Google Calendar")
+    }
+    let client = GoogleClient(config: config)
+    let calendars = try googleCalendarList(config: config, client: client)
+    var counts = syncCounts()
+    var details: [[String: Any]] = []
+    for calendar in calendars {
+        let calendarID = stringField(calendar, ["id"]) ?? "primary"
+        let summary = stringField(calendar, ["summary"]) ?? calendarID
+        let cursor = try state.syncCursor(source: "google_calendar_events", collectionID: calendarID, cursorType: "syncToken")
+        let page: GooglePagedItems
+        do {
+            page = try googleCalendarEvents(config: config, client: client, calendarID: calendarID, syncToken: cursor)
+        } catch GoogleHTTPError.status(410, _) {
+            try state.clearSyncCursor(source: "google_calendar_events", collectionID: calendarID, cursorType: "syncToken")
+            page = try googleCalendarEvents(config: config, client: client, calendarID: calendarID, syncToken: nil)
+            details.append(["collection": calendarID, "cursor_reset": true])
+        }
+        for event in page.items {
+            let itemResult = try syncGoogleCalendarEvent(config: config, state: state, event: event, calendarID: calendarID, calendarSummary: summary, dryRun: dryRun)
+            incrementSyncCounts(&counts, itemResult)
+        }
+        if !dryRun {
+            try state.recordSyncCursor(source: "google_calendar_events", collectionID: calendarID, cursorType: "syncToken", value: page.nextSyncToken)
+        }
+        details.append(["collection": calendarID, "summary": summary, "items": page.items.count, "next_sync_token": page.nextSyncToken == nil ? NSNull() : "stored"])
+    }
+    return googleSyncResult(source: "google_calendar_events", dryRun: dryRun, counts: counts, details: details)
+}
+
+func syncGoogleTasks(config: AppConfig, state: StateStore, dryRun: Bool) throws -> [String: Any] {
+    if !dryRun {
+        try requireGoogleAuthorization(config: config, operation: "sync Google Tasks")
+        try requireEventKitAuthorization(for: .reminder, operation: "sync Google Tasks")
+    }
+    let client = GoogleClient(config: config)
+    let lists = try googleTaskLists(config: config, client: client)
+    var counts = syncCounts()
+    var details: [[String: Any]] = []
+    for list in lists {
+        let listID = stringField(list, ["id"]) ?? "@default"
+        let title = stringField(list, ["title"]) ?? listID
+        let tasks = try googleTasks(config: config, client: client, taskListID: listID)
+        for task in tasks {
+            let itemResult = try syncGoogleTask(config: config, state: state, task: task, taskListID: listID, taskListTitle: title, dryRun: dryRun)
+            incrementSyncCounts(&counts, itemResult)
+        }
+        details.append(["collection": listID, "title": title, "items": tasks.count])
+    }
+    return googleSyncResult(source: "google_tasks", dryRun: dryRun, counts: counts, details: details)
+}
+
+func syncGoogleContacts(config: AppConfig, state: StateStore, dryRun: Bool) throws -> [String: Any] {
+    if !dryRun {
+        try requireGoogleAuthorization(config: config, operation: "sync Google Contacts")
+        try requireContactsAuthorization(operation: "sync Google Contacts")
+    }
+    let client = GoogleClient(config: config)
+    let cursor = try state.syncCursor(source: "google_contacts", collectionID: "people/me/connections", cursorType: "syncToken")
+    let payload: [String: Any]
+    do {
+        payload = try googlePeopleConnections(config: config, client: client, syncToken: cursor)
+    } catch GoogleHTTPError.status(410, _) {
+        try state.clearSyncCursor(source: "google_contacts", collectionID: "people/me/connections", cursorType: "syncToken")
+        payload = try googlePeopleConnections(config: config, client: client, syncToken: nil)
+    }
+    let people = payload["connections"] as? [[String: Any]] ?? []
+    var counts = syncCounts()
+    for person in people {
+        let itemResult = try syncGoogleContact(state: state, person: person, dryRun: dryRun)
+        incrementSyncCounts(&counts, itemResult)
+    }
+    if !dryRun {
+        try state.recordSyncCursor(source: "google_contacts", collectionID: "people/me/connections", cursorType: "syncToken", value: payload["nextSyncToken"] as? String)
+    }
+    return googleSyncResult(source: "google_contacts", dryRun: dryRun, counts: counts, details: [["collection": "people/me/connections", "items": people.count, "next_sync_token": payload["nextSyncToken"] == nil ? NSNull() : "stored"]])
+}
+
+func syncCounts() -> [String: Int] {
+    ["created": 0, "updated": 0, "deleted": 0, "completed": 0, "skipped": 0, "errors": 0]
+}
+
+func incrementSyncCounts(_ counts: inout [String: Int], _ key: String) {
+    counts[key, default: 0] += 1
+}
+
+func googleSyncResult(source: String, dryRun: Bool, counts: [String: Int], details: [[String: Any]]) -> [String: Any] {
+    [
+        "source": source,
+        "action": "google_sync",
+        "status": dryRun ? "dry_run" : "done",
+        "counts": counts,
+        "details": details
+    ] as [String: Any]
+}
+
+struct GooglePagedItems {
+    let items: [[String: Any]]
+    let nextSyncToken: String?
+}
+
+func googleCalendarList(config: AppConfig, client: GoogleClient) throws -> [[String: Any]] {
+    let sourceConfig = config.sourceConfig("google_calendar_events")
+    if let configured = sourceConfig["calendar_ids"] as? [String], !configured.isEmpty {
+        return configured.map { ["id": $0, "summary": $0] }
+    }
+    let payload = try client.getJSON(path: "/calendar/v3/users/me/calendarList", query: [:])
+    return payload["items"] as? [[String: Any]] ?? []
+}
+
+func googleCalendarEvents(config: AppConfig, client: GoogleClient, calendarID: String, syncToken: String?) throws -> GooglePagedItems {
+    let sourceConfig = config.sourceConfig("google_calendar_events")
+    var query: [String: String] = ["singleEvents": "true", "showDeleted": "true", "maxResults": "\(sourceConfig["page_size"] as? Int ?? 250)"]
+    if let syncToken {
+        query["syncToken"] = syncToken
+    } else {
+        query["timeMin"] = sourceConfig["time_min"] as? String ?? isoString(Date().addingTimeInterval(-7 * 24 * 3600))
+        query["timeMax"] = sourceConfig["time_max"] as? String ?? isoString(Date().addingTimeInterval(60 * 24 * 3600))
+    }
+    let payload = try client.getJSON(path: "/calendar/v3/calendars/\(urlPathEscape(calendarID))/events", query: query)
+    return GooglePagedItems(items: payload["items"] as? [[String: Any]] ?? [], nextSyncToken: payload["nextSyncToken"] as? String)
+}
+
+func googleTaskLists(config: AppConfig, client: GoogleClient) throws -> [[String: Any]] {
+    let sourceConfig = config.sourceConfig("google_tasks")
+    if let configured = sourceConfig["task_list_ids"] as? [String], !configured.isEmpty {
+        return configured.map { ["id": $0, "title": $0] }
+    }
+    let payload = try client.getJSON(path: "/tasks/v1/users/@me/lists", query: ["maxResults": "\(sourceConfig["page_size"] as? Int ?? 100)"])
+    return payload["items"] as? [[String: Any]] ?? []
+}
+
+func googleTasks(config: AppConfig, client: GoogleClient, taskListID: String) throws -> [[String: Any]] {
+    let sourceConfig = config.sourceConfig("google_tasks")
+    let payload = try client.getJSON(
+        path: "/tasks/v1/lists/\(urlPathEscape(taskListID))/tasks",
+        query: [
+            "maxResults": "\(sourceConfig["page_size"] as? Int ?? 100)",
+            "showCompleted": "true",
+            "showDeleted": "true",
+            "showHidden": "true"
+        ]
+    )
+    return payload["items"] as? [[String: Any]] ?? []
+}
+
+func googlePeopleConnections(config: AppConfig, client: GoogleClient, syncToken: String?) throws -> [String: Any] {
+    let sourceConfig = config.sourceConfig("google_contacts")
+    var query: [String: String] = [
+        "pageSize": "\(sourceConfig["page_size"] as? Int ?? 100)",
+        "personFields": sourceConfig["person_fields"] as? String ?? "names,emailAddresses,phoneNumbers,organizations,birthdays,addresses,metadata",
+        "requestSyncToken": "true"
+    ]
+    if let syncToken { query["syncToken"] = syncToken }
+    return try client.getJSON(path: "/v1/people/me/connections", query: query)
+}
+
+func syncGoogleCalendarEvent(config: AppConfig, state: StateStore, event: [String: Any], calendarID: String, calendarSummary: String, dryRun: Bool) throws -> String {
+    guard let googleID = stringField(event, ["id"]) else { return "skipped" }
+    let mapping = try state.syncMapping(source: "google_calendar_events", googleID: "\(calendarID):\(googleID)", appleKind: "calendar_event")
+    if stringField(event, ["status"]) == "cancelled" {
+        if !dryRun, let externalID = mapping?["apple_external_id"] as? String {
+            try deleteAppleCalendarEvent(externalID)
+            try state.markSyncMappingDeleted(source: "google_calendar_events", googleID: "\(calendarID):\(googleID)", appleKind: "calendar_event")
+            return "deleted"
+        }
+        return mapping == nil ? "skipped" : "deleted"
+    }
+    if dryRun { return mapping == nil ? "created" : "updated" }
+    let appleID = try upsertGoogleCalendarEvent(config: config, event: event, calendarID: calendarID, calendarSummary: calendarSummary, existingExternalID: mapping?["apple_external_id"] as? String)
+    try state.recordSyncMapping(source: "google_calendar_events", googleID: "\(calendarID):\(googleID)", appleKind: "calendar_event", appleExternalID: appleID, googleETag: stringField(event, ["etag"]))
+    return mapping == nil ? "created" : "updated"
+}
+
+func syncGoogleTask(config: AppConfig, state: StateStore, task: [String: Any], taskListID: String, taskListTitle: String, dryRun: Bool) throws -> String {
+    guard let googleID = stringField(task, ["id"]) else { return "skipped" }
+    let compoundID = "\(taskListID):\(googleID)"
+    let mapping = try state.syncMapping(source: "google_tasks", googleID: compoundID, appleKind: "reminder")
+    if boolField(task, "deleted") {
+        if !dryRun, let externalID = mapping?["apple_external_id"] as? String {
+            try deleteAppleReminder(externalID)
+            try state.markSyncMappingDeleted(source: "google_tasks", googleID: compoundID, appleKind: "reminder")
+            return "deleted"
+        }
+        return mapping == nil ? "skipped" : "deleted"
+    }
+    if dryRun { return stringField(task, ["status"]) == "completed" ? "completed" : (mapping == nil ? "created" : "updated") }
+    let appleID = try upsertGoogleTaskReminder(task: task, taskListTitle: taskListTitle, existingExternalID: mapping?["apple_external_id"] as? String)
+    try state.recordSyncMapping(source: "google_tasks", googleID: compoundID, appleKind: "reminder", appleExternalID: appleID, googleETag: stringField(task, ["etag"]))
+    return stringField(task, ["status"]) == "completed" ? "completed" : (mapping == nil ? "created" : "updated")
+}
+
+func syncGoogleContact(state: StateStore, person: [String: Any], dryRun: Bool) throws -> String {
+    guard let resourceName = stringField(person, ["resourceName"]) else { return "skipped" }
+    let mapping = try state.syncMapping(source: "google_contacts", googleID: resourceName, appleKind: "contact")
+    if googlePersonDeleted(person) {
+        if !dryRun, let externalID = mapping?["apple_external_id"] as? String {
+            try deleteAppleContact(externalID)
+            try state.markSyncMappingDeleted(source: "google_contacts", googleID: resourceName, appleKind: "contact")
+            return "deleted"
+        }
+        return mapping == nil ? "skipped" : "deleted"
+    }
+    if dryRun { return mapping == nil ? "created" : "updated" }
+    let appleID = try upsertGoogleContact(person: person, existingExternalID: mapping?["apple_external_id"] as? String)
+    try state.recordSyncMapping(source: "google_contacts", googleID: resourceName, appleKind: "contact", appleExternalID: appleID, googleETag: stringField(person, ["etag"]))
+    return mapping == nil ? "created" : "updated"
+}
+
+func upsertGoogleCalendarEvent(config: AppConfig, event: [String: Any], calendarID: String, calendarSummary: String, existingExternalID: String?) throws -> String {
+    let store = sharedEventStoreBox.store
+    let calendar = try findOrCreateGoogleEventCalendar(config: config, calendarID: calendarID, summary: calendarSummary, store: store)
+    let item = eventKitItem(existingExternalID, store: store) as? EKEvent ?? EKEvent(eventStore: store)
+    item.title = stringField(event, ["summary"]) ?? "(untitled Google event)"
+    item.notes = stringField(event, ["description"])
+    item.location = stringField(event, ["location"])
+    item.url = stringField(event, ["htmlLink"]).flatMap(URL.init(string:))
+    let dates = googleEventDates(event)
+    item.startDate = dates.start
+    item.endDate = max(dates.end, dates.start.addingTimeInterval(60))
+    item.isAllDay = dates.allDay
+    item.calendar = calendar
+    try store.save(item, span: .thisEvent, commit: true)
+    return "x-apple-calendar://\(item.calendarItemIdentifier)"
+}
+
+func upsertGoogleTaskReminder(task: [String: Any], taskListTitle: String, existingExternalID: String?) throws -> String {
+    let store = sharedEventStoreBox.store
+    let reminder = eventKitItem(existingExternalID, store: store) as? EKReminder ?? EKReminder(eventStore: store)
+    reminder.title = stringField(task, ["title"]) ?? "(untitled Google task)"
+    reminder.notes = stringField(task, ["notes"])
+    reminder.calendar = try findOrCreateGoogleReminderList(named: "Google Tasks - \(taskListTitle)", store: store)
+    reminder.isCompleted = stringField(task, ["status"]) == "completed"
+    if let completed = stringField(task, ["completed"]).flatMap(parseDate) {
+        reminder.completionDate = completed
+    }
+    if let due = stringField(task, ["due"]).flatMap(parseDate) {
+        reminder.dueDateComponents = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: due)
+    } else {
+        reminder.dueDateComponents = nil
+    }
+    try store.save(reminder, commit: true)
+    return "x-apple-reminder://\(reminder.calendarItemIdentifier)"
+}
+
+func upsertGoogleContact(person: [String: Any], existingExternalID: String?) throws -> String {
+    let store = sharedContactStoreBox.store
+    let contact: CNMutableContact
+    let keys = googleContactKeys()
+    if let existingExternalID, let existing = try? store.unifiedContact(withIdentifier: stripAppleURL(existingExternalID), keysToFetch: keys) {
+        contact = existing.mutableCopy() as! CNMutableContact
+    } else {
+        contact = CNMutableContact()
+    }
+    applyGooglePerson(person, to: contact)
+    let request = CNSaveRequest()
+    if existingExternalID == nil || contact.identifier.isEmpty {
+        if let container = try iCloudContactsContainer(store: store) {
+            request.add(contact, toContainerWithIdentifier: container.identifier)
+        } else {
+            request.add(contact, toContainerWithIdentifier: nil)
+        }
+    } else {
+        request.update(contact)
+    }
+    try store.execute(request)
+    return "x-apple-contact://\(contact.identifier)"
+}
+
+func deleteAppleCalendarEvent(_ externalID: String) throws {
+    let store = sharedEventStoreBox.store
+    if let event = eventKitItem(externalID, store: store) as? EKEvent {
+        try store.remove(event, span: .thisEvent, commit: true)
+    }
+}
+
+func deleteAppleReminder(_ externalID: String) throws {
+    let store = sharedEventStoreBox.store
+    if let reminder = eventKitItem(externalID, store: store) as? EKReminder {
+        try store.remove(reminder, commit: true)
+    }
+}
+
+func deleteAppleContact(_ externalID: String) throws {
+    let store = sharedContactStoreBox.store
+    if let existing = try? store.unifiedContact(withIdentifier: stripAppleURL(externalID), keysToFetch: googleContactKeys()) {
+        let request = CNSaveRequest()
+        request.delete(existing.mutableCopy() as! CNMutableContact)
+        try store.execute(request)
+    }
+}
+
+func findOrCreateGoogleEventCalendar(config: AppConfig, calendarID: String, summary: String, store: EKEventStore) throws -> EKCalendar {
+    let sourceConfig = config.sourceConfig("google_calendar_events")
+    let names = sourceConfig["apple_calendar_names"] as? [String: String] ?? [:]
+    let name = names[calendarID] ?? "Google - \(summary)"
+    if let found = store.calendars(for: .event).first(where: { $0.title == name && $0.allowsContentModifications }) {
+        return found
+    }
+    guard let source = iCloudEventSource(store: store) ?? store.defaultCalendarForNewEvents?.source ?? store.sources.first(where: { $0.sourceType == .local }) else {
+        throw AppError.runtime("No writable Calendar source available for Google calendar \(summary).")
+    }
+    let calendar = EKCalendar(for: .event, eventStore: store)
+    calendar.title = name
+    calendar.source = source
+    try store.saveCalendar(calendar, commit: true)
+    return calendar
+}
+
+func findOrCreateGoogleReminderList(named name: String, store: EKEventStore) throws -> EKCalendar {
+    if let found = store.calendars(for: .reminder).first(where: { $0.title == name && $0.allowsContentModifications }) {
+        return found
+    }
+    guard let source = iCloudReminderSource(store: store) ?? store.defaultCalendarForNewReminders()?.source else {
+        throw AppError.runtime("No writable Reminders source available for \(name).")
+    }
+    let list = EKCalendar(for: .reminder, eventStore: store)
+    list.title = name
+    list.source = source
+    try store.saveCalendar(list, commit: true)
+    return list
+}
+
+func iCloudEventSource(store: EKEventStore) -> EKSource? {
+    store.sources.first { $0.sourceType == .calDAV && $0.title.lowercased().contains("icloud") }
+}
+
+func iCloudReminderSource(store: EKEventStore) -> EKSource? {
+    store.calendars(for: .reminder)
+        .filter { $0.allowsContentModifications }
+        .map(\.source)
+        .first { $0.sourceType == .calDAV && $0.title.lowercased().contains("icloud") }
+    ?? store.calendars(for: .reminder)
+        .first { $0.allowsContentModifications }?
+        .source
+}
+
+func iCloudContactsContainer(store: CNContactStore) throws -> CNContainer? {
+    let containers = try store.containers(matching: nil)
+    return containers.first { $0.type == .cardDAV && $0.name.lowercased().contains("icloud") } ?? containers.first(where: { $0.type == .local }) ?? containers.first
+}
+
+func googleCalendarSignal(event: [String: Any], calendarID: String, calendarSummary: String) -> Signal {
+    let googleID = stringField(event, ["id"]) ?? sha256Prefix(String(describing: event))
+    let dates = googleEventDates(event)
+    return Signal(
+        source: "google_calendar_events",
+        sourceID: "\(calendarID):\(googleID)",
+        title: stringField(event, ["summary"]) ?? "(untitled Google event)",
+        body: stringField(event, ["description"]) ?? "",
+        kind: "google_calendar_event",
+        occurredAt: isoString(dates.start),
+        metadata: [
+            "canonical_key": "google:calendar:\(calendarID):\(googleID)",
+            "calendar_id": calendarID,
+            "calendar_summary": calendarSummary,
+            "calendar_start": isoString(dates.start),
+            "calendar_end": isoString(dates.end),
+            "status": stringField(event, ["status"]) ?? "",
+            "projection_target": "calendar",
+            "strict_mirror": true
+        ]
+    )
+}
+
+func googleTaskSignal(task: [String: Any], taskListID: String, taskListTitle: String) -> Signal {
+    let googleID = stringField(task, ["id"]) ?? sha256Prefix(String(describing: task))
+    return Signal(
+        source: "google_tasks",
+        sourceID: "\(taskListID):\(googleID)",
+        title: stringField(task, ["title"]) ?? "(untitled Google task)",
+        body: stringField(task, ["notes"]) ?? "",
+        kind: "google_task",
+        occurredAt: stringField(task, ["updated"]) ?? nowISO(),
+        metadata: [
+            "canonical_key": "google:task:\(taskListID):\(googleID)",
+            "task_list_id": taskListID,
+            "task_list_title": taskListTitle,
+            "due_date": stringField(task, ["due"]) ?? "",
+            "status": stringField(task, ["status"]) ?? "",
+            "deleted": boolField(task, "deleted"),
+            "projection_target": "reminder",
+            "strict_mirror": true
+        ]
+    )
+}
+
+func googleContactSignal(_ person: [String: Any]) -> Signal {
+    let resourceName = stringField(person, ["resourceName"]) ?? sha256Prefix(String(describing: person))
+    let title = googlePersonDisplayName(person) ?? "(unnamed Google contact)"
+    return Signal(
+        source: "google_contacts",
+        sourceID: resourceName,
+        title: title,
+        body: "Google contact preview: \(title)",
+        kind: "google_contact",
+        occurredAt: nowISO(),
+        metadata: [
+            "canonical_key": "google:contact:\(resourceName)",
+            "resource_name": resourceName,
+            "deleted": googlePersonDeleted(person),
+            "projection_target": "contact",
+            "strict_mirror": true
+        ]
+    )
+}
+
+func googleEventDates(_ event: [String: Any]) -> (start: Date, end: Date, allDay: Bool) {
+    let startObj = event["start"] as? [String: Any] ?? [:]
+    let endObj = event["end"] as? [String: Any] ?? [:]
+    let startRaw = stringField(startObj, ["dateTime", "date"]) ?? nowISO()
+    let endRaw = stringField(endObj, ["dateTime", "date"]) ?? startRaw
+    let start = parseDate(startRaw) ?? Date()
+    let end = parseDate(endRaw) ?? Calendar.current.date(byAdding: .minute, value: 30, to: start) ?? start.addingTimeInterval(1800)
+    return (start, end, startObj["date"] is String)
+}
+
+func googlePersonDisplayName(_ person: [String: Any]) -> String? {
+    guard let names = person["names"] as? [[String: Any]] else { return nil }
+    return names.compactMap { stringField($0, ["displayName", "unstructuredName"]) }.first
+}
+
+func googlePersonDeleted(_ person: [String: Any]) -> Bool {
+    if let metadata = person["metadata"] as? [String: Any], boolField(metadata, "deleted") {
+        return true
+    }
+    return boolField(person, "deleted")
+}
+
+func applyGooglePerson(_ person: [String: Any], to contact: CNMutableContact) {
+    if let names = person["names"] as? [[String: Any]], let name = names.first {
+        contact.givenName = stringField(name, ["givenName"]) ?? ""
+        contact.familyName = stringField(name, ["familyName"]) ?? ""
+        contact.middleName = stringField(name, ["middleName"]) ?? ""
+        contact.nickname = stringField(name, ["displayName"]) ?? ""
+    }
+    contact.emailAddresses = (person["emailAddresses"] as? [[String: Any]] ?? []).compactMap { item in
+        guard let value = stringField(item, ["value"]) else { return nil }
+        return CNLabeledValue(label: googleContactLabel(item), value: value as NSString)
+    }
+    contact.phoneNumbers = (person["phoneNumbers"] as? [[String: Any]] ?? []).compactMap { item in
+        guard let value = stringField(item, ["value", "canonicalForm"]) else { return nil }
+        return CNLabeledValue(label: googleContactLabel(item), value: CNPhoneNumber(stringValue: value))
+    }
+    if let organization = (person["organizations"] as? [[String: Any]])?.first {
+        contact.organizationName = stringField(organization, ["name"]) ?? ""
+        contact.jobTitle = stringField(organization, ["title"]) ?? ""
+        contact.departmentName = stringField(organization, ["department"]) ?? ""
+    }
+    contact.postalAddresses = (person["addresses"] as? [[String: Any]] ?? []).compactMap { item in
+        let address = CNMutablePostalAddress()
+        address.street = stringField(item, ["streetAddress"]) ?? ""
+        address.city = stringField(item, ["city"]) ?? ""
+        address.state = stringField(item, ["region"]) ?? ""
+        address.postalCode = stringField(item, ["postalCode"]) ?? ""
+        address.country = stringField(item, ["country"]) ?? ""
+        guard ![address.street, address.city, address.state, address.postalCode, address.country].joined().isEmpty else { return nil }
+        return CNLabeledValue(label: googleContactLabel(item), value: address)
+    }
+    if let birthday = (person["birthdays"] as? [[String: Any]])?.first?["date"] as? [String: Any] {
+        var components = DateComponents()
+        components.year = birthday["year"] as? Int
+        components.month = birthday["month"] as? Int
+        components.day = birthday["day"] as? Int
+        contact.birthday = components
+    }
+}
+
+func googleContactKeys() -> [CNKeyDescriptor] {
+    [
+        CNContactIdentifierKey,
+        CNContactGivenNameKey,
+        CNContactFamilyNameKey,
+        CNContactMiddleNameKey,
+        CNContactNicknameKey,
+        CNContactEmailAddressesKey,
+        CNContactPhoneNumbersKey,
+        CNContactOrganizationNameKey,
+        CNContactJobTitleKey,
+        CNContactDepartmentNameKey,
+        CNContactPostalAddressesKey,
+        CNContactBirthdayKey
+    ] as [CNKeyDescriptor]
+}
+
+func googleContactLabel(_ item: [String: Any]) -> String {
+    switch (stringField(item, ["type"]) ?? "").lowercased() {
+    case "home": return CNLabelHome
+    case "work": return CNLabelWork
+    default: return CNLabelOther
+    }
+}
+
+func contactsStatus() -> [String: String] {
+    ["contacts": contactsAuthorizationDescription(CNContactStore.authorizationStatus(for: .contacts)), "mode": "swift-native-contacts"]
+}
+
+func requestContactsAccess() throws -> [String: Any] {
+    let before = CNContactStore.authorizationStatus(for: .contacts)
+    if isContactsAuthorized(before) {
+        return ["status": "already_authorized", "before": contactsAuthorizationDescription(before), "after": contactsAuthorizationDescription(before)]
+    }
+    let semaphore = DispatchSemaphore(value: 0)
+    final class ResultBox: @unchecked Sendable {
+        var granted = false
+        var error: Error?
+    }
+    let box = ResultBox()
+    sharedContactStoreBox.store.requestAccess(for: .contacts) { granted, error in
+        box.granted = granted
+        box.error = error
+        semaphore.signal()
+    }
+    semaphore.wait()
+    if let error = box.error {
+        throw AppError.runtime("Contacts access request failed: \(error.localizedDescription)")
+    }
+    let after = CNContactStore.authorizationStatus(for: .contacts)
+    return ["status": box.granted ? "granted" : "not_granted", "before": contactsAuthorizationDescription(before), "after": contactsAuthorizationDescription(after)]
+}
+
+func requireContactsAuthorization(operation: String) throws {
+    let status = CNContactStore.authorizationStatus(for: .contacts)
+    guard isContactsAuthorized(status) else {
+        throw AppError.runtime("Contacts access is \(contactsAuthorizationDescription(status)); run `bin/smart-shadow contacts-request-access` in the foreground before \(operation).")
+    }
+}
+
+func isContactsAuthorized(_ status: CNAuthorizationStatus) -> Bool {
+    status == .authorized
+}
+
+func contactsAuthorizationDescription(_ status: CNAuthorizationStatus) -> String {
+    switch status {
+    case .notDetermined: return "not_determined"
+    case .restricted: return "restricted"
+    case .denied: return "denied"
+    case .authorized: return "authorized"
+    case .limited: return "limited"
+    @unknown default: return "unknown"
+    }
+}
+
+func googleAuthCommand(_ config: AppConfig, subcommand: String, arguments: [String]) throws -> [String: Any] {
+    switch subcommand {
+    case "status":
+        return googleAuthStatus(config)
+    case "logout":
+        try keychainDelete(account: "token")
+        return ["status": "logged_out"]
+    case "login":
+        return try googleAuthLogin(config)
+    default:
+        throw AppError.usage("google-auth expects login, status, or logout.")
+    }
+}
+
+func googleAuthStatus(_ config: AppConfig) -> [String: Any] {
+    var status: [String: Any] = ["mode": "google-oauth-keychain"]
+    status["client_id_configured"] = googleOAuthClientID(config) != nil
+    if let token = try? keychainReadToken() {
+        status["authorized"] = true
+        status["access_token_expires_at"] = isoString(token.expiresAt)
+        status["refresh_token_present"] = token.refreshToken != nil
+    } else {
+        status["authorized"] = false
+        status["refresh_token_present"] = false
+    }
+    return status
+}
+
+func googleAuthLogin(_ config: AppConfig) throws -> [String: Any] {
+    guard let clientID = googleOAuthClientID(config) else {
+        throw AppError.runtime("Google OAuth client id is missing; set google.oauth_client_id in config.")
+    }
+    let port = try reserveLoopbackPort()
+    let redirectURI = "http://127.0.0.1:\(port)/callback"
+    let state = sha256Prefix(UUID().uuidString + nowISO())
+    let scopes = googleOAuthScopes(config).joined(separator: " ")
+    var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+    components.queryItems = [
+        URLQueryItem(name: "client_id", value: clientID),
+        URLQueryItem(name: "redirect_uri", value: redirectURI),
+        URLQueryItem(name: "response_type", value: "code"),
+        URLQueryItem(name: "scope", value: scopes),
+        URLQueryItem(name: "access_type", value: "offline"),
+        URLQueryItem(name: "prompt", value: "consent"),
+        URLQueryItem(name: "state", value: state)
+    ]
+    guard let authURL = components.url else { throw AppError.runtime("Unable to build Google auth URL.") }
+    _ = try? shellOutput(["open", authURL.absoluteString])
+    let callback = try waitForLoopbackCallback(port: port, expectedState: state)
+    let payload = try GoogleClient(config: config).postForm(path: "/token", form: [
+        "client_id": clientID,
+        "client_secret": googleOAuthClientSecret(config) ?? "",
+        "code": callback.code,
+        "grant_type": "authorization_code",
+        "redirect_uri": redirectURI
+    ])
+    guard let accessToken = payload["access_token"] as? String else {
+        throw AppError.runtime("Google token response did not include an access token.")
+    }
+    let expiresIn = payload["expires_in"] as? Double ?? Double(payload["expires_in"] as? Int ?? 3600)
+    let token = GoogleToken(accessToken: accessToken, refreshToken: payload["refresh_token"] as? String, expiresAt: Date().addingTimeInterval(expiresIn))
+    try keychainWriteToken(token)
+    return ["status": "ok", "authorized": true, "scopes": googleOAuthScopes(config), "token_storage": "keychain"]
+}
+
+func requireGoogleAuthorization(config: AppConfig, operation: String) throws {
+    if hasGoogleMock(config) { return }
+    guard googleOAuthClientID(config) != nil else {
+        throw AppError.runtime("Google OAuth client id is missing; set google.oauth_client_id before \(operation).")
+    }
+    _ = try googleAccessToken(config)
+}
+
+func googleAuthBlockers(config: AppConfig, source: String) -> [String] {
+    if hasGoogleMock(config, source: source) { return [] }
+    var blockers: [String] = []
+    if googleOAuthClientID(config) == nil {
+        blockers.append("google_oauth_client_id_missing")
+    }
+    if (try? keychainReadToken()) == nil {
+        blockers.append("google_auth_missing")
+    }
+    return blockers
+}
+
+func googleAccessToken(_ config: AppConfig) throws -> String {
+    var token = try keychainReadToken()
+    if token.expiresAt.timeIntervalSinceNow > 60 {
+        return token.accessToken
+    }
+    guard let refresh = token.refreshToken, let clientID = googleOAuthClientID(config) else {
+        throw AppError.runtime("Google access token expired and no refresh token/client id is available; run `bin/smart-shadow google-auth login`.")
+    }
+    let payload = try GoogleClient(config: config).postForm(path: "/token", form: [
+        "client_id": clientID,
+        "client_secret": googleOAuthClientSecret(config) ?? "",
+        "refresh_token": refresh,
+        "grant_type": "refresh_token"
+    ])
+    guard let access = payload["access_token"] as? String else {
+        throw AppError.runtime("Google refresh response did not include an access token.")
+    }
+    let expiresIn = payload["expires_in"] as? Double ?? Double(payload["expires_in"] as? Int ?? 3600)
+    token = GoogleToken(accessToken: access, refreshToken: refresh, expiresAt: Date().addingTimeInterval(expiresIn))
+    try keychainWriteToken(token)
+    return access
+}
+
+func googleOAuthClientID(_ config: AppConfig) -> String? {
+    (config.raw["google"] as? [String: Any])?["oauth_client_id"] as? String
+}
+
+func googleOAuthClientSecret(_ config: AppConfig) -> String? {
+    (config.raw["google"] as? [String: Any])?["oauth_client_secret"] as? String
+}
+
+func googleOAuthScopes(_ config: AppConfig) -> [String] {
+    if let scopes = (config.raw["google"] as? [String: Any])?["oauth_scopes"] as? [String], !scopes.isEmpty {
+        return scopes
+    }
+    return [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/tasks.readonly",
+        "https://www.googleapis.com/auth/contacts.readonly"
+    ]
+}
+
+func keychainReadToken() throws -> GoogleToken {
+    guard let data = try keychainRead(account: "token") else {
+        throw AppError.runtime("Google OAuth token is missing; run `bin/smart-shadow google-auth login`.")
+    }
+    return try JSONDecoder().decode(GoogleToken.self, from: data)
+}
+
+func keychainWriteToken(_ token: GoogleToken) throws {
+    try keychainWrite(account: "token", data: JSONEncoder().encode(token))
+}
+
+func keychainRead(account: String) throws -> Data? {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: googleKeychainService,
+        kSecAttrAccount as String: account,
+        kSecReturnData as String: true
+    ]
+    var item: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess else { throw AppError.runtime("Keychain read failed: \(status)") }
+    return item as? Data
+}
+
+func keychainWrite(account: String, data: Data) throws {
+    try keychainDelete(account: account)
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: googleKeychainService,
+        kSecAttrAccount as String: account,
+        kSecValueData as String: data
+    ]
+    let status = SecItemAdd(query as CFDictionary, nil)
+    guard status == errSecSuccess else { throw AppError.runtime("Keychain write failed: \(status)") }
+}
+
+func keychainDelete(account: String) throws {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: googleKeychainService,
+        kSecAttrAccount as String: account
+    ]
+    let status = SecItemDelete(query as CFDictionary)
+    guard status == errSecSuccess || status == errSecItemNotFound else { throw AppError.runtime("Keychain delete failed: \(status)") }
+}
+
+func syncHTTPRequest(_ request: URLRequest) throws -> (status: Int, body: String) {
+    let semaphore = DispatchSemaphore(value: 0)
+    final class ResponseBox: @unchecked Sendable {
+        var data: Data?
+        var response: URLResponse?
+        var error: Error?
+    }
+    let box = ResponseBox()
+    URLSession.shared.dataTask(with: request) { data, response, error in
+        box.data = data
+        box.response = response
+        box.error = error
+        semaphore.signal()
+    }.resume()
+    semaphore.wait()
+    if let error = box.error { throw error }
+    let status = (box.response as? HTTPURLResponse)?.statusCode ?? 0
+    let body = String(data: box.data ?? Data(), encoding: .utf8) ?? ""
+    return (status, body)
+}
+
+func parseJSONObject(_ text: String) throws -> [String: Any] {
+    guard let object = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
+        throw AppError.runtime("Expected JSON object.")
+    }
+    return object
+}
+
+func googleMockPayload(_ config: AppConfig) throws -> [String: Any]? {
+    let paths = googleSyncSources.compactMap { config.sourceConfig($0)["mock_file"] as? String }
+    guard let rawPath = paths.first else { return nil }
+    return try parseJSONObject(String(contentsOfFile: configuredPath(rawPath, config: config), encoding: .utf8))
+}
+
+func hasGoogleMock(_ config: AppConfig, source: String? = nil) -> Bool {
+    if let source {
+        return config.sourceConfig(source)["mock_file"] is String
+    }
+    return googleSyncSources.contains { config.sourceConfig($0)["mock_file"] is String }
+}
+
+func googleMockResponse(_ mock: [String: Any], path: String, query: [String: String]) throws -> [String: Any] {
+    if path == "/calendar/v3/users/me/calendarList" {
+        return ["items": mock["calendarLists"] as? [[String: Any]] ?? []]
+    }
+    if path.contains("/calendar/v3/calendars/") {
+        let id = path.components(separatedBy: "/calendar/v3/calendars/").last?.components(separatedBy: "/events").first?.removingPercentEncoding ?? "primary"
+        if query["syncToken"] == "force-410" { throw GoogleHTTPError.status(410, "mock sync token expired") }
+        return ((mock["calendarEvents"] as? [String: Any])?[id] as? [String: Any]) ?? ["items": []]
+    }
+    if path == "/tasks/v1/users/@me/lists" {
+        return ["items": mock["taskLists"] as? [[String: Any]] ?? []]
+    }
+    if path.contains("/tasks/v1/lists/") {
+        let id = path.components(separatedBy: "/tasks/v1/lists/").last?.components(separatedBy: "/tasks").first?.removingPercentEncoding ?? "@default"
+        return ((mock["tasks"] as? [String: Any])?[id] as? [String: Any]) ?? ["items": []]
+    }
+    if path == "/v1/people/me/connections" {
+        if query["syncToken"] == "force-410" { throw GoogleHTTPError.status(410, "mock sync token expired") }
+        return mock["connections"] as? [String: Any] ?? ["connections": []]
+    }
+    throw AppError.runtime("No mock response for Google path: \(path)")
+}
+
+func formURLEncoded(_ form: [String: String]) -> String {
+    form.map { "\(urlQueryEscape($0.key))=\(urlQueryEscape($0.value))" }.sorted().joined(separator: "&")
+}
+
+func urlQueryEscape(_ value: String) -> String {
+    value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+}
+
+func urlPathEscape(_ value: String) -> String {
+    value.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? value
+}
+
+func stripAppleURL(_ externalID: String) -> String {
+    externalID
+        .replacingOccurrences(of: "x-apple-calendar://", with: "")
+        .replacingOccurrences(of: "x-apple-reminder://", with: "")
+        .replacingOccurrences(of: "x-apple-contact://", with: "")
+}
+
+func boolField(_ object: [String: Any], _ key: String) -> Bool {
+    if let value = object[key] as? Bool { return value }
+    if let value = object[key] as? String { return parseBool(value) }
+    if let value = object[key] as? NSNumber { return value.boolValue }
+    return false
+}
+
+func reserveLoopbackPort() throws -> Int {
+    let socketFD = socket(AF_INET, SOCK_STREAM, 0)
+    guard socketFD >= 0 else { throw AppError.runtime("Unable to create loopback socket.") }
+    defer { close(socketFD) }
+    var addr = sockaddr_in()
+    addr.sin_family = sa_family_t(AF_INET)
+    addr.sin_port = in_port_t(0).bigEndian
+    addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+    var mutableAddr = addr
+    let bindStatus = withUnsafePointer(to: &mutableAddr) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    guard bindStatus == 0 else { throw AppError.runtime("Unable to bind loopback socket.") }
+    var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+    var bound = sockaddr_in()
+    let status = withUnsafeMutablePointer(to: &bound) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            getsockname(socketFD, $0, &len)
+        }
+    }
+    guard status == 0 else { throw AppError.runtime("Unable to inspect loopback port.") }
+    return Int(UInt16(bigEndian: bound.sin_port))
+}
+
+func waitForLoopbackCallback(port: Int, expectedState: String) throws -> (code: String, state: String) {
+    let socketFD = socket(AF_INET, SOCK_STREAM, 0)
+    guard socketFD >= 0 else { throw AppError.runtime("Unable to create Google callback socket.") }
+    defer { close(socketFD) }
+    var yes: Int32 = 1
+    setsockopt(socketFD, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+    var addr = sockaddr_in()
+    addr.sin_family = sa_family_t(AF_INET)
+    addr.sin_port = in_port_t(port).bigEndian
+    addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+    var mutableAddr = addr
+    let bindStatus = withUnsafePointer(to: &mutableAddr) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    guard bindStatus == 0, listen(socketFD, 1) == 0 else {
+        throw AppError.runtime("Unable to listen for Google OAuth callback.")
+    }
+    let client = accept(socketFD, nil, nil)
+    guard client >= 0 else { throw AppError.runtime("Google OAuth callback was not received.") }
+    defer { close(client) }
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    let count = recv(client, &buffer, buffer.count, 0)
+    let request = count > 0 ? String(decoding: buffer.prefix(count), as: UTF8.self) : ""
+    guard let firstLine = request.components(separatedBy: "\r\n").first,
+          let path = firstLine.split(separator: " ").dropFirst().first,
+          let components = URLComponents(string: "http://127.0.0.1\(path)") else {
+        throw AppError.runtime("Google OAuth callback request was malformed.")
+    }
+    let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+    let html = "<html><body>Google authorization received. You can close this window.</body></html>"
+    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(html.utf8.count)\r\n\r\n\(html)"
+    _ = response.withCString { send(client, $0, strlen($0), 0) }
+    guard query["state"] == expectedState, let code = query["code"], !code.isEmpty else {
+        throw AppError.runtime("Google OAuth callback did not include the expected state and code.")
+    }
+    return (code, query["state"] ?? "")
+}
+
 func acceptSource(_ config: AppConfig, name: String, limit: Int) throws -> [String: Any] {
     try ensureRuntime(config)
     let registry = try loadRuleRegistry(config.rulesFile)
@@ -1376,6 +3109,7 @@ func acceptSource(_ config: AppConfig, name: String, limit: Int) throws -> [Stri
         return [
             "source_id": signal.sourceID,
             "title": signal.title,
+            "body": signal.body,
             "kind": signal.kind,
             "occurred_at": signal.occurredAt,
             "metadata": signal.metadata,
@@ -1396,9 +3130,174 @@ func acceptSource(_ config: AppConfig, name: String, limit: Int) throws -> [Stri
     return output
 }
 
+func projectMailDecision(_ config: AppConfig, inputPath: String, dryRun: Bool, noReminders: Bool) throws -> [String: Any] {
+    guard !inputPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw AppError.usage("project-mail-decision requires --input PATH.")
+    }
+    try ensureRuntime(config)
+    let path = absolutePath(inputPath, base: FileManager.default.currentDirectoryPath)
+    let payload = try parseJSONObject(String(contentsOfFile: path, encoding: .utf8))
+    let (signal, decision) = try explicitMailProjection(payload)
+
+    let state = try StateStore(path: config.dbPath)
+    defer { state.close() }
+    let ingest = try state.ingest(signal)
+    let decisionID = try state.recordDecision(signalID: ingest.id, decision: decision)
+    let actionResult = try executeDecision(config, state: state, signal: signal, decision: decision, dryRun: dryRun, noReminders: noReminders)
+    let actionID = try state.recordAction(decisionID: decisionID, result: actionResult)
+    let result: [String: Any] = [
+        "status": "ok",
+        "input": path,
+        "signal_id": ingest.id,
+        "signal_created": ingest.created,
+        "decision_id": decisionID,
+        "action_id": actionID,
+        "dedupe_key": signal.dedupeKey,
+        "canonical_key": projectionCanonicalKey(signal),
+        "decision": encodableDictionary(decision),
+        "action_result": actionResult.dictionary
+    ]
+    try appendAudit(config, ["type": "explicit_mail_decision_projected"].merging(result) { _, new in new })
+    return result
+}
+
+func explicitMailProjection(_ payload: [String: Any]) throws -> (Signal, Decision) {
+    let canonicalKey = try requiredString(payload, "canonical_key")
+    let sourceID = try requiredString(payload, "source_id", fallbackKeys: ["message_id"])
+    let subject = try requiredString(payload, "subject")
+    let sender = try requiredString(payload, "sender")
+    let receivedAt = stringField(payload, ["received_at", "receivedAt"]) ?? nowISO()
+    let mailbox = stringField(payload, ["mailbox"]) ?? "INBOX"
+    let summary = stringField(payload, ["summary"]) ?? ""
+    let projectionTarget = try requiredString(payload, "projection_target")
+    let action = try requiredString(payload, "action")
+    let domain = try requiredString(payload, "domain")
+    let priority = try requiredString(payload, "priority")
+    let risk = try requiredString(payload, "risk")
+    let reason = try requiredString(payload, "reason")
+    let suggestedAction = stringField(payload, ["suggested_action", "suggestedAction"])
+    try validateExplicitMailProjectionTarget(projectionTarget, action: action)
+
+    var metadata: [String: Any] = [
+        "canonical_key": canonicalKey,
+        "mail_app_surface": true,
+        "codex_automation_decision": true,
+        "sender": sender,
+        "subject": subject,
+        "mailbox": mailbox,
+        "received_at": receivedAt,
+        "projection_target": projectionTarget
+    ]
+    if !summary.isEmpty { metadata["summary"] = summary }
+    if let suggestedAction { metadata["suggested_action"] = suggestedAction }
+
+    let body = [
+        "发件人: \(sender)",
+        "主题: \(subject)",
+        "邮箱: \(mailbox)",
+        "收信时间: \(receivedAt)",
+        summary.isEmpty ? nil : "摘要: \(summary)",
+        suggestedAction.map { "建议动作: \($0)" },
+        "判定依据: \(reason)"
+    ].compactMap { $0 }.joined(separator: "\n")
+
+    let needsReview = projectionTarget == "apple_reminder"
+    let decision = Decision(
+        domain: domain,
+        priority: priority,
+        risk: risk,
+        needsReview: needsReview,
+        action: action,
+        reason: reason,
+        confidence: stringField(payload, ["confidence"]) ?? "high",
+        projectionTarget: projectionTarget
+    )
+    let signal = Signal(
+        source: "apple_mail_app",
+        sourceID: sourceID,
+        title: "邮件: \(subject)",
+        body: body,
+        kind: "apple_mail_app_decision",
+        occurredAt: receivedAt,
+        metadata: metadata
+    )
+    return (signal, decision)
+}
+
+func validateExplicitMailProjectionTarget(_ projectionTarget: String, action: String) throws {
+    switch projectionTarget {
+    case "apple_reminder":
+        guard action == "create_review_reminder" else {
+            throw AppError.usage("apple_reminder mail decisions must use action=create_review_reminder.")
+        }
+    case "record_only":
+        guard action == "record_only" else {
+            throw AppError.usage("record_only mail decisions must use action=record_only.")
+        }
+    case "mail_action":
+        guard action == "archive_low_value" else {
+            throw AppError.usage("mail_action currently supports action=archive_low_value.")
+        }
+    default:
+        throw AppError.usage("Unsupported projection_target for mail decision: \(projectionTarget)")
+    }
+}
+
+func requiredString(_ payload: [String: Any], _ key: String, fallbackKeys: [String] = []) throws -> String {
+    let keys = [key] + fallbackKeys
+    if let value = stringField(payload, keys) {
+        return value
+    }
+    throw AppError.usage("Mail decision input missing required field: \(key)")
+}
+
 func processSignal(_ config: AppConfig, state: StateStore, registry: RuleRegistry, signal: Signal, dryRun: Bool, noReminders: Bool) throws -> [String: Any] {
     let ingest = try state.ingest(signal)
     if !ingest.created {
+        if larkStructuredSources.contains(signal.source) {
+            let decision = decide(signal, registry)
+            let actionResult = try executeDecision(config, state: state, signal: signal, decision: decision, dryRun: dryRun, noReminders: noReminders)
+            let result: [String: Any] = [
+                "signal_id": ingest.id,
+                "dedupe_key": signal.dedupeKey,
+                "status": "refreshed_duplicate",
+                "decision": encodableDictionary(decision),
+                "action_result": actionResult.dictionary
+            ]
+            try appendAudit(config, ["type": "refreshed_duplicate_signal"].merging(result) { _, new in new })
+            return result
+        }
+        if !dryRun, let dryRunAttempt = try state.latestDryRunDecision(signalID: ingest.id) {
+            let decisionID = try state.recordDecision(signalID: ingest.id, decision: dryRunAttempt.decision)
+            let actionResult = try executeDecision(config, state: state, signal: signal, decision: dryRunAttempt.decision, dryRun: dryRun, noReminders: noReminders)
+            let actionID = try state.recordAction(decisionID: decisionID, result: actionResult)
+            let result: [String: Any] = [
+                "signal_id": ingest.id,
+                "decision_id": decisionID,
+                "action_id": actionID,
+                "dedupe_key": signal.dedupeKey,
+                "status": "retried_dry_run",
+                "decision": encodableDictionary(dryRunAttempt.decision),
+                "action_result": actionResult.dictionary
+            ]
+            try appendAudit(config, ["type": "retried_dry_run_signal"].merging(result) { _, new in new })
+            return result
+        }
+        if let pending = try state.pendingDecision(signalID: ingest.id) {
+            let actionResult = try executeDecision(config, state: state, signal: signal, decision: pending.decision, dryRun: dryRun, noReminders: noReminders)
+            let actionID = try state.recordAction(decisionID: pending.id, result: actionResult)
+            let result: [String: Any] = [
+                "signal_id": ingest.id,
+                "decision_id": pending.id,
+                "action_id": actionID,
+                "dedupe_key": signal.dedupeKey,
+                "status": "retried_pending",
+                "decision": encodableDictionary(pending.decision),
+                "action_result": actionResult.dictionary
+            ]
+            try appendAudit(config, ["type": "retried_pending_signal"].merging(result) { _, new in new })
+            return result
+        }
         let result: [String: Any] = ["signal_id": ingest.id, "dedupe_key": signal.dedupeKey, "status": "duplicate", "action": "none"]
         try appendAudit(config, ["type": "duplicate_signal"].merging(result) { _, new in new })
         return result
@@ -1423,38 +3322,95 @@ func executeDecision(_ config: AppConfig, state: StateStore, signal: Signal, dec
     if dryRun {
         return ActionResult(action: decision.action, status: "dry_run", detail: "No external action executed.", externalID: nil)
     }
+    if decision.action == "sync_projection" {
+        let result = try syncStructuredProjection(config: config, state: state, signal: signal, decision: decision, noReminders: noReminders)
+        return ActionResult(action: decision.action, status: "done", detail: result.detail, externalID: result.externalID)
+    }
     if decision.action == "create_review_reminder", config.autoCreateReviewReminders, config.remindersEnabled, !noReminders {
-        let canonicalKey = projectionCanonicalKey(signal)
-        if let existing = try state.projection(for: canonicalKey) {
-            return ActionResult(
-                action: decision.action,
-                status: "done",
-                detail: "Existing EventKit projection reused for canonical work item.",
-                externalID: projectionExternalID(existing)
-            )
-        }
-        let listName = config.domainLists[decision.domain] ?? "WORK"
-        var externalIDs: [String] = []
-        let reminderID = try createReminder(listName: listName, signal: signal, decision: decision)
-        externalIDs.append(reminderID)
-        var calendarID: String?
-        var details = ["Created Reminders item in \(listName) through EventKit."]
-        if let eventID = try createCalendarEventIfScheduled(signal: signal, decision: decision) {
-            externalIDs.append(eventID)
-            calendarID = eventID
-            details.append("Created Calendar time block through EventKit.")
-        }
-        try state.recordProjection(canonicalKey: canonicalKey, reminderExternalID: reminderID, calendarExternalID: calendarID)
-        return ActionResult(action: decision.action, status: "done", detail: details.joined(separator: " "), externalID: externalIDs.joined(separator: " "))
+        return try createReviewReminderAction(config: config, state: state, signal: signal, decision: decision)
     }
     if decision.action == "archive_low_value", config.autoArchiveLowValue {
         if signal.source == "apple_mail_app" {
-            let externalID = try archiveAppleMailAppMessage(config, signal: signal)
-            return ActionResult(action: decision.action, status: "done", detail: "Archived low-value Mail.app message through configured executor.", externalID: externalID)
+            do {
+                let externalID = try archiveAppleMailAppMessage(config, signal: signal)
+                return ActionResult(action: decision.action, status: "done", detail: "Archived low-value Mail.app message through configured executor.", externalID: externalID)
+            } catch {
+                let errorText = appErrorMessage(error)
+                let reviewDecision = Decision(
+                    domain: decision.domain,
+                    priority: "high",
+                    risk: "medium",
+                    needsReview: true,
+                    action: "create_review_reminder",
+                    reason: "archive_low_value.failed: \(errorText)",
+                    confidence: "high"
+                )
+                if config.autoCreateReviewReminders, config.remindersEnabled, !noReminders {
+                    let reviewResult = try createReviewReminderAction(config: config, state: state, signal: signal, decision: reviewDecision)
+                    return ActionResult(action: decision.action, status: "needs_review", detail: "Archive failed; created review reminder. \(reviewResult.detail) Error: \(errorText)", externalID: reviewResult.externalID)
+                }
+                return ActionResult(action: decision.action, status: "needs_review", detail: "Archive failed; review required but Reminders were disabled for this run. Error: archive_low_value.failed: \(errorText)", externalID: nil)
+            }
         }
         return ActionResult(action: decision.action, status: "done", detail: "Low-value signal archived in audit log only.", externalID: nil)
     }
     return ActionResult(action: decision.action, status: "done", detail: "Recorded without user-visible action.", externalID: nil)
+}
+
+func appErrorMessage(_ error: Error) -> String {
+    if let appError = error as? AppError {
+        return appError.description
+    }
+    return String(describing: error)
+}
+
+func createReviewReminderAction(config: AppConfig, state: StateStore, signal: Signal, decision: Decision) throws -> ActionResult {
+    let canonicalKey = projectionCanonicalKey(signal)
+    let listName = config.domainLists[decision.domain] ?? "WORK"
+    let existing = try state.projection(for: canonicalKey)
+    var externalIDs: [String] = []
+    let reminderID = try upsertReminder(existingID: existing?.reminderExternalID, listName: listName, signal: signal, decision: decision)
+    externalIDs.append(reminderID)
+    var calendarID: String?
+    var details = [existing?.reminderExternalID == nil ? "Created Reminders item in \(listName) through EventKit." : "Updated Reminders item in \(listName) through EventKit."]
+    if let eventID = try upsertCalendarEventIfScheduled(config: config, existingID: existing?.calendarExternalID, signal: signal, decision: decision) {
+        externalIDs.append(eventID)
+        calendarID = eventID
+        details.append(existing?.calendarExternalID == nil ? "Created Calendar time block through EventKit." : "Updated Calendar time block through EventKit.")
+    }
+    try state.recordProjection(canonicalKey: canonicalKey, reminderExternalID: reminderID, calendarExternalID: calendarID)
+    return ActionResult(action: decision.action, status: "done", detail: details.joined(separator: " "), externalID: externalIDs.joined(separator: " "))
+}
+
+func syncStructuredProjection(config: AppConfig, state: StateStore, signal: Signal, decision: Decision, noReminders: Bool) throws -> (detail: String, externalID: String?) {
+    let canonicalKey = projectionCanonicalKey(signal)
+    let existing = try state.projection(for: canonicalKey)
+    var reminderID: String?
+    var calendarID: String?
+    var details: [String] = []
+
+    if signal.source == "lark_calendar_events" {
+        if isEventKitAuthorized(EKEventStore.authorizationStatus(for: .event), for: .event) {
+            calendarID = try upsertCalendarEventIfScheduled(config: config, existingID: existing?.calendarExternalID, signal: signal, decision: decision)
+            details.append(existing?.calendarExternalID == nil ? "Created Calendar event from Lark through EventKit." : "Updated Calendar event from Lark through EventKit.")
+        } else {
+            details.append("Skipped Calendar event because EventKit Calendar is not authorized for this process.")
+        }
+    } else if signal.source == "lark_tasks" {
+        if !noReminders, config.remindersEnabled, isEventKitAuthorized(EKEventStore.authorizationStatus(for: .reminder), for: .reminder) {
+            let listName = config.domainLists[decision.domain] ?? "WORK"
+            reminderID = try upsertReminder(existingID: existing?.reminderExternalID, listName: listName, signal: signal, decision: decision)
+            details.append(existing?.reminderExternalID == nil ? "Created Reminders item from Lark task through EventKit." : "Updated Reminders item from Lark task through EventKit.")
+        } else {
+            details.append("Skipped Reminders item because reminders are disabled or EventKit Reminders is not authorized for this process.")
+        }
+    } else {
+        throw AppError.runtime("sync_projection is not supported for source: \(signal.source)")
+    }
+
+    try state.recordProjection(canonicalKey: canonicalKey, reminderExternalID: reminderID, calendarExternalID: calendarID)
+    let externalID = [reminderID, calendarID].compactMap { $0 }.joined(separator: " ")
+    return (details.joined(separator: " "), externalID.isEmpty ? nil : externalID)
 }
 
 func archiveAppleMailAppMessage(_ config: AppConfig, signal: Signal) throws -> String {
@@ -1498,55 +3454,102 @@ func canonicalKeyFromStoredSignal(dedupeKey: String, metadataJSON: String) -> St
 }
 
 func projectionExternalID(_ record: ProjectionRecord) -> String {
-    [record.reminderExternalID, record.calendarExternalID]
+    [record.reminderExternalID, record.calendarExternalID, record.larkTaskURL, record.larkTaskGUID.map { "lark-task://\($0)" }]
         .compactMap { $0 }
         .filter { !$0.isEmpty }
         .joined(separator: " ")
 }
 
-func createReminder(listName: String, signal: Signal, decision: Decision) throws -> String {
-    try requireEventKitAuthorization(for: .reminder, operation: "create Apple Reminders review card")
-    let store = EKEventStore()
-    let reminder = EKReminder(eventStore: store)
+func upsertReminder(existingID: String?, listName: String, signal: Signal, decision: Decision) throws -> String {
+    try requireEventKitAuthorization(for: .reminder, operation: "sync Apple Reminders item")
+    let store = sharedEventStoreBox.store
+    let reminder = eventKitItem(existingID, store: store) as? EKReminder ?? EKReminder(eventStore: store)
     reminder.title = signal.title
     reminder.notes = reminderBody(signal: signal, decision: decision)
-    reminder.calendar = try findReminderCalendar(named: listName, store: store)
+    if reminder.calendar == nil {
+        reminder.calendar = try findReminderCalendar(named: listName, store: store)
+    }
     reminder.priority = reminderPriority(decision.priority)
-    if let due = signalMetadataDate(signal, keys: ["due_date", "dueDate"]) ?? reminderDueDate(decision.risk, decision.priority) {
+    let fallbackDue = decision.action == "create_review_reminder" ? reminderDueDate(decision.risk, decision.priority) : nil
+    if let due = signalMetadataDate(signal, keys: ["due_date", "dueDate"]) ?? fallbackDue {
         reminder.dueDateComponents = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: due)
+    } else {
+        reminder.dueDateComponents = nil
     }
     try store.save(reminder, commit: true)
     return "x-apple-reminder://\(reminder.calendarItemIdentifier)"
 }
 
-func createCalendarEventIfScheduled(signal: Signal, decision: Decision) throws -> String? {
+func upsertCalendarEventIfScheduled(config: AppConfig, existingID: String?, signal: Signal, decision: Decision) throws -> String? {
     guard let start = signalMetadataDate(signal, keys: ["calendar_start", "start", "start_at"]),
           let end = signalMetadataDate(signal, keys: ["calendar_end", "end", "end_at"]) ?? Calendar.current.date(byAdding: .minute, value: 30, to: start)
     else {
         return nil
     }
-    try requireEventKitAuthorization(for: .event, operation: "create Apple Calendar time block")
-    let store = EKEventStore()
-    guard let calendar = store.defaultCalendarForNewEvents, calendar.allowsContentModifications else {
-        throw AppError.runtime("No writable default Calendar found.")
-    }
-    let event = EKEvent(eventStore: store)
+    try requireEventKitAuthorization(for: .event, operation: "sync Apple Calendar time block")
+    let store = sharedEventStoreBox.store
+    let calendar = try findEventCalendar(named: calendarName(for: decision.domain, config: config), store: store)
+    let event = eventKitItem(existingID, store: store) as? EKEvent ?? EKEvent(eventStore: store)
     event.title = signal.title
     event.notes = calendarNotes(signal: signal, decision: decision)
+    event.url = calendarURL(signal)
     event.startDate = start
     event.endDate = max(end, start.addingTimeInterval(60))
-    event.calendar = calendar
+    if event.calendar == nil || event.calendar.calendarIdentifier != calendar.calendarIdentifier {
+        event.calendar = calendar
+    }
     try store.save(event, span: .thisEvent, commit: true)
     return "x-apple-calendar://\(event.calendarItemIdentifier)"
 }
 
-func calendarNotes(signal: Signal, decision: Decision) -> String {
-    let summary = signal.body.isEmpty ? "智能影子为该事项预留的时间块。" : signal.body
-    return """
-    \(summary)
+func calendarName(for domain: String, config: AppConfig) -> String {
+    config.calendarDomainCalendars[domain] ?? domain.uppercased()
+}
 
-    时间块用途：处理或审核该工作项。
-    """
+func findEventCalendar(named name: String, store: EKEventStore) throws -> EKCalendar {
+    if let found = store.calendars(for: .event).first(where: { $0.title == name && $0.allowsContentModifications }) {
+        return found
+    }
+    guard let source = store.defaultCalendarForNewEvents?.source ?? store.sources.first(where: { $0.sourceType == .local }) ?? store.sources.first else {
+        throw AppError.runtime("No Calendar source available for \(name).")
+    }
+    let calendar = EKCalendar(for: .event, eventStore: store)
+    calendar.title = name
+    calendar.source = source
+    try store.saveCalendar(calendar, commit: true)
+    return calendar
+}
+
+func eventKitItem(_ externalID: String?, store: EKEventStore) -> EKCalendarItem? {
+    guard let externalID, !externalID.isEmpty else { return nil }
+    let identifier = externalID
+        .replacingOccurrences(of: "x-apple-reminder://", with: "")
+        .replacingOccurrences(of: "x-apple-calendar://", with: "")
+    return store.calendarItem(withIdentifier: identifier)
+}
+
+func calendarNotes(signal: Signal, decision: Decision) -> String? {
+    for key in ["description", "notes", "content"] {
+        if let value = signal.metadata[key] as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+    }
+    let trimmed = signal.body.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
+func calendarURL(_ signal: Signal) -> URL? {
+    guard let raw = signal.metadata["url"] as? String else {
+        return nil
+    }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+        return nil
+    }
+    return URL(string: trimmed)
 }
 
 func signalMetadataDate(_ signal: Signal, keys: [String]) -> Date? {
@@ -1687,9 +3690,13 @@ func writeSourceAcceptanceReport(_ config: AppConfig, payload: [String: Any]) th
         "- 本验收不创建 Apple Reminders 或 Apple Calendar 项，不发送外部消息，不移动或删除文件。",
         "- file_metadata 只读取文件名、路径、大小和修改时间；文件内容默认未读取。",
         "- lark_daily_context 只运行配置中的本机只读命令并保存 compact 摘要；本项目不保存飞书凭证。",
+        "- lark_calendar_events 通过 lark-cli 用户身份只读飞书日程，并只把结构化字段交给 EventKit 投影。",
+        "- lark_tasks 通过 lark-cli 用户身份只读飞书任务，并只把结构化字段交给 EventKit 投影。",
+        "- google_calendar_events、google_tasks 和 google_contacts 通过 Google 官方 API 只读采集；本验收不写 Apple Calendar、Reminders 或 Contacts。",
+        "- 正式 Google 同步只会删除 Smart Shadow sync_mappings 中已有映射的 Apple 对象，不按标题或内容删除用户原有 iCloud 数据。",
         "- chrome_bookmarks 只读取 Chrome 书签元数据；网页内容、历史记录、Cookies 和登录态默认未读取。",
         "- apple_mail_summary 读取配置指定的本地邮件摘要 JSON，用于离线回放和规则验收。",
-        "- apple_mail_app 通过配置的 Mail.app 读取器采集真实邮件；本验收不写 Mail.app，正式运行可按配置执行低风险动作。",
+        "- Mail.app 真实邮件由 Codex Automation 感知和判断；Smart Shadow 只通过 project-mail-decision 接收显式投影决策。",
         "- 启用后台感知仍需单独修改配置并重新验收。",
         ""
     ])
@@ -1786,6 +3793,366 @@ func appendAudit(_ config: AppConfig, _ event: [String: Any]) throws {
     try appendJSONLine(payload, to: config.auditLog)
 }
 
+struct ShadowDProjectIssue {
+    let itemID: String?
+    let projectID: String?
+    let statusFieldID: String?
+    let doneOptionID: String?
+    let repo: String
+    let number: Int
+    let title: String
+    let body: String
+    let url: String
+    let state: String
+    let projectStatus: String?
+    let customStatus: String?
+    let labels: [String]
+}
+
+func handleShadowDCommand(_ config: AppConfig, arguments: [String]) throws -> [String: Any] {
+    let subcommand = arguments.first ?? "once"
+    let rest = Array(arguments.dropFirst())
+    let dryRun = rest.contains("--dry-run") || subcommand == "inspect-issue"
+    switch subcommand {
+    case "once":
+        return try shadowDRunOnce(config: config, arguments: rest, dryRun: dryRun)
+    case "run":
+        try appendAudit(config, ["type": "shadowd_started", "mode": "github_project_reconciler"])
+        while true {
+            do {
+                _ = try shadowDRunOnce(config: config, arguments: rest, dryRun: false)
+            } catch {
+                try? writeDaemonErrorReport(config, error: error)
+                try? appendAudit(config, ["type": "shadowd_run_error", "error": "\(error)"])
+                fputs("shadowd: reconciler run failed: \(error)\n", stderr)
+            }
+            sleep(config.pollSeconds)
+        }
+    case "inspect-issue":
+        return try shadowDInspectIssue(config: config, arguments: rest)
+    default:
+        throw AppError.usage("Unsupported shadowd command: \(subcommand)")
+    }
+}
+
+func shadowDRunOnce(config: AppConfig, arguments: [String], dryRun: Bool) throws -> [String: Any] {
+    let source = try loadShadowDProjectIssues(arguments: arguments)
+    let allowWrites = arguments.contains("--write-comments")
+    let effectiveDryRun = dryRun || !allowWrites
+    let results = try source.items.map { try shadowDReconcile(issue: $0, dryRun: effectiveDryRun) }
+    let actionCount = results.filter { ($0["action"] as? String) != "no_op" }.count
+    let output: [String: Any] = [
+        "status": effectiveDryRun ? "dry_run" : "ok",
+        "mode": "github_project_reconciler",
+        "source_of_truth": "github_project_issue_pr",
+        "local_task_db": false,
+        "github_writes_enabled": allowWrites,
+        "scope": [
+            "owner": source.owner,
+            "project_number": source.projectNumber,
+            "repo_filter": source.repoFilter as Any? ?? NSNull(),
+            "requires_smartshadow_label": false
+        ],
+        "item_count": source.items.count,
+        "action_count": actionCount,
+        "results": results
+    ]
+    try appendAudit(config, [
+        "type": "shadowd_reconcile",
+        "dry_run": effectiveDryRun,
+        "github_writes_enabled": allowWrites,
+        "item_count": source.items.count,
+        "action_count": actionCount
+    ])
+    return output
+}
+
+func shadowDInspectIssue(config: AppConfig, arguments: [String]) throws -> [String: Any] {
+    let source = try loadShadowDProjectIssues(arguments: arguments)
+    let issueNumber = Int(optionValue(arguments, "--issue") ?? "")
+    let issue = issueNumber.flatMap { number in source.items.first(where: { $0.number == number }) } ?? source.items.first
+    guard let issue else { throw AppError.runtime("No issue found to inspect.") }
+    let plan = try shadowDReconcile(issue: issue, dryRun: true)
+    return [
+        "status": "ok",
+        "mode": "inspect",
+        "issue": shadowDIssueSummary(issue),
+        "planned_result": plan,
+        "local_task_db": false
+    ] as [String: Any]
+}
+
+func shadowDReconcile(issue: ShadowDProjectIssue, dryRun: Bool) throws -> [String: Any] {
+    let summary = shadowDIssueSummary(issue)
+    if issue.state.lowercased() != "open" {
+        return try shadowDResult(issue: issue, action: "no_op", reason: "issue_not_open", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+    }
+    if shadowDIsVoiceIssue(issue) {
+        if shadowDIsDoneish(issue.projectStatus) || issue.labels.contains(where: { shadowDNormalizeStatus($0).contains("ready") }) {
+            return try shadowDResult(issue: issue, action: "no_op", reason: "voice_issue_already_ready", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+        }
+        if shadowDHasRawTranscript(issue.body) {
+            let comment = "ShadowD detected a legacy voice issue body. Please rewrite it with the final task description first, omit the raw transcript, and keep metadata compact/folded."
+            return try shadowDResult(issue: issue, action: "comment_question", reason: "legacy_voice_body_needs_compaction", dryRun: dryRun, command: shadowDCommentCommand(issue: issue, body: comment), comment: comment, extra: ["issue": summary])
+        }
+        return try shadowDResult(issue: issue, action: "no_op", reason: "voice_issue_waiting_for_transcription_state", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+    }
+    if shadowDIsDoneish(issue.customStatus), !shadowDIsDoneish(issue.projectStatus) {
+        let intent = shadowDProjectStatusCommand(issue: issue, status: "Done")
+        return try shadowDResult(issue: issue, action: "update_project_status", reason: "custom_status_done_project_status_not_done", dryRun: true, command: intent, comment: nil, extra: ["issue": summary])
+    }
+    if !shadowDHasIssueTemplateEssentials(issue.body) {
+        let comment = """
+        ShadowD cannot safely start this issue yet because the issue body is missing the required task template sections.
+
+        Please fill in Background, Goal, Scope, Acceptance Criteria, Constraints, Suggested Starting Points, and Agent Instructions.
+        """
+        return try shadowDResult(issue: issue, action: "comment_question", reason: "missing_issue_template_sections", dryRun: dryRun, command: shadowDCommentCommand(issue: issue, body: comment), comment: comment, extra: ["issue": summary])
+    }
+    return try shadowDResult(issue: issue, action: "no_op", reason: "github_state_already_consistent", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+}
+
+func shadowDResult(issue: ShadowDProjectIssue, action: String, reason: String, dryRun: Bool, command: [String]?, comment: String?, extra: [String: Any]) throws -> [String: Any] {
+    var result = extra
+    result["action"] = action
+    result["reason"] = reason
+    result["dry_run"] = dryRun
+    if let command { result["argv"] = command; result["command"] = command.joined(separator: " ") }
+    if let comment { result["comment"] = comment }
+    if !dryRun, let command, action == "comment_question" {
+        let shell = try shellResult(command)
+        result["gh_exit_status"] = shell.status
+        result["gh_output"] = shell.output
+        if shell.status != 0 {
+            throw AppError.runtime("GitHub comment failed: \(shell.output)")
+        }
+    }
+    return result
+}
+
+func shadowDIssueSummary(_ issue: ShadowDProjectIssue) -> [String: Any] {
+    [
+        "item_id": issue.itemID ?? NSNull(),
+        "repo": issue.repo,
+        "number": issue.number,
+        "title": issue.title,
+        "url": issue.url,
+        "state": issue.state,
+        "project_status": issue.projectStatus ?? NSNull(),
+        "custom_status": issue.customStatus ?? NSNull(),
+        "labels": issue.labels,
+        "voice_issue": shadowDIsVoiceIssue(issue)
+    ] as [String: Any]
+}
+
+func shadowDIsVoiceIssue(_ issue: ShadowDProjectIssue) -> Bool {
+    let body = issue.body.lowercased()
+    return body.contains("\"audio_path\"") || body.contains("smart shadow metadata") || issue.labels.contains(where: { shadowDNormalizeStatus($0) == "voice" })
+}
+
+func shadowDHasRawTranscript(_ body: String) -> Bool {
+    body.range(of: "Raw Transcript", options: [.caseInsensitive]) != nil
+}
+
+func shadowDHasIssueTemplateEssentials(_ body: String) -> Bool {
+    let required = ["## Background", "## Goal", "## Scope", "## Acceptance Criteria", "## Constraints", "## Suggested Starting Points", "## Agent Instructions"]
+    return required.allSatisfy { body.range(of: $0, options: [.caseInsensitive]) != nil }
+}
+
+func shadowDIsDoneish(_ value: String?) -> Bool {
+    guard let value else { return false }
+    return ["done", "completed", "complete", "closed", "完成"].contains(shadowDNormalizeStatus(value))
+}
+
+func shadowDNormalizeStatus(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+        .replacingOccurrences(of: "ss/state:", with: "")
+        .replacingOccurrences(of: "status:", with: "")
+        .replacingOccurrences(of: "_", with: "-")
+}
+
+func shadowDCommentCommand(issue: ShadowDProjectIssue, body: String) -> [String] {
+    ["gh", "issue", "comment", "\(issue.number)", "--repo", issue.repo, "--body", body]
+}
+
+func shadowDProjectStatusCommand(issue: ShadowDProjectIssue, status: String) -> [String] {
+    var command = ["gh", "project", "item-edit"]
+    if let projectID = issue.projectID { command += ["--project-id", projectID] }
+    if let itemID = issue.itemID { command += ["--id", itemID] }
+    if let fieldID = issue.statusFieldID { command += ["--field-id", fieldID] }
+    if let doneOptionID = issue.doneOptionID { command += ["--single-select-option-id", doneOptionID] }
+    command += ["# desired-status=\(status)"]
+    return command
+}
+
+struct ShadowDProjectIssueSource {
+    let owner: String
+    let projectNumber: Int
+    let repoFilter: String?
+    let items: [ShadowDProjectIssue]
+}
+
+func loadShadowDProjectIssues(arguments: [String]) throws -> ShadowDProjectIssueSource {
+    let owner = optionValue(arguments, "--owner") ?? "longbiaochen"
+    let projectNumber = Int(optionValue(arguments, "--project") ?? "1") ?? 1
+    let repoFilter = optionValue(arguments, "--repo") ?? "longbiaochen/life-os"
+    if let fixture = optionValue(arguments, "--fixture") {
+        let data = try Data(contentsOf: URL(fileURLWithPath: fixture))
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AppError.runtime("ShadowD fixture must be a JSON object.")
+        }
+        return ShadowDProjectIssueSource(owner: owner, projectNumber: projectNumber, repoFilter: repoFilter, items: shadowDParseProjectIssues(json, repoFilter: repoFilter))
+    }
+    let query = """
+    query($login: String!, $number: Int!) {
+      user(login: $login) {
+        projectV2(number: $number) {
+          id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+                options { id name }
+              }
+            }
+          }
+          items(first: 100) {
+            nodes {
+              id
+              fieldValues(first: 30) {
+                nodes {
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    field { ... on ProjectV2SingleSelectField { id name } }
+                  }
+                }
+              }
+              content {
+                ... on Issue {
+                  number
+                  title
+                  body
+                  url
+                  state
+                  repository { nameWithOwner }
+                  labels(first: 30) { nodes { name } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    let shell = try shellResult(["gh", "api", "graphql", "-f", "query=\(query)", "-f", "login=\(owner)", "-F", "number=\(projectNumber)"], timeoutSeconds: 20)
+    guard shell.status == 0 else {
+        throw AppError.runtime("GitHub Project query failed or timed out: \(shell.output)")
+    }
+    let raw = shell.output
+    let data = Data(raw.utf8)
+    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw AppError.runtime("Unable to parse GitHub Project response.")
+    }
+    return ShadowDProjectIssueSource(owner: owner, projectNumber: projectNumber, repoFilter: repoFilter, items: shadowDParseProjectIssues(json, repoFilter: repoFilter))
+}
+
+func shadowDParseProjectIssues(_ json: [String: Any], repoFilter: String?) -> [ShadowDProjectIssue] {
+    if let items = json["items"] as? [[String: Any]] {
+        return items.compactMap { shadowDParseFixtureIssue($0, repoFilter: repoFilter) }
+    }
+    guard
+        let data = json["data"] as? [String: Any],
+        let user = data["user"] as? [String: Any],
+        let project = user["projectV2"] as? [String: Any],
+        let itemContainer = project["items"] as? [String: Any],
+        let nodes = itemContainer["nodes"] as? [[String: Any]]
+    else { return [] }
+    let projectID = project["id"] as? String
+    let statusInfo = shadowDProjectStatusField(project)
+    return nodes.compactMap { node -> ShadowDProjectIssue? in
+        guard
+            let content = node["content"] as? [String: Any],
+            let number = content["number"] as? Int,
+            let repository = content["repository"] as? [String: Any],
+            let repo = repository["nameWithOwner"] as? String
+        else { return nil }
+        if let repoFilter, repo != repoFilter { return nil }
+        let labels = (((content["labels"] as? [String: Any])?["nodes"] as? [[String: Any]]) ?? []).compactMap { $0["name"] as? String }
+        let statuses = shadowDProjectStatuses(node)
+        return ShadowDProjectIssue(
+            itemID: node["id"] as? String,
+            projectID: projectID,
+            statusFieldID: statusInfo.fieldID,
+            doneOptionID: statusInfo.doneOptionID,
+            repo: repo,
+            number: number,
+            title: content["title"] as? String ?? "",
+            body: content["body"] as? String ?? "",
+            url: content["url"] as? String ?? "",
+            state: content["state"] as? String ?? "OPEN",
+            projectStatus: statuses.projectStatus,
+            customStatus: statuses.customStatus,
+            labels: labels
+        )
+    }
+}
+
+func shadowDParseFixtureIssue(_ item: [String: Any], repoFilter: String?) -> ShadowDProjectIssue? {
+    let repo = item["repo"] as? String ?? item["repository"] as? String ?? "longbiaochen/life-os"
+    if let repoFilter, repo != repoFilter { return nil }
+    guard let number = item["number"] as? Int ?? Int(item["number"] as? String ?? "") else { return nil }
+    return ShadowDProjectIssue(
+        itemID: item["item_id"] as? String,
+        projectID: item["project_id"] as? String,
+        statusFieldID: item["status_field_id"] as? String,
+        doneOptionID: item["done_option_id"] as? String,
+        repo: repo,
+        number: number,
+        title: item["title"] as? String ?? "",
+        body: item["body"] as? String ?? "",
+        url: item["url"] as? String ?? "https://github.com/\(repo)/issues/\(number)",
+        state: item["state"] as? String ?? "OPEN",
+        projectStatus: item["project_status"] as? String,
+        customStatus: item["custom_status"] as? String,
+        labels: item["labels"] as? [String] ?? []
+    )
+}
+
+func shadowDProjectStatuses(_ node: [String: Any]) -> (projectStatus: String?, customStatus: String?) {
+    let values = (((node["fieldValues"] as? [String: Any])?["nodes"] as? [[String: Any]]) ?? [])
+    var projectStatus: String?
+    var customStatus: String?
+    for value in values {
+        guard let name = value["name"] as? String else { continue }
+        let fieldName = ((value["field"] as? [String: Any])?["name"] as? String) ?? ""
+        if fieldName.caseInsensitiveCompare("Status") == .orderedSame {
+            projectStatus = name
+        } else if fieldName.localizedCaseInsensitiveContains("custom") || fieldName.localizedCaseInsensitiveContains("状态") {
+            customStatus = name
+        }
+    }
+    return (projectStatus, customStatus)
+}
+
+func shadowDProjectStatusField(_ project: [String: Any]) -> (fieldID: String?, doneOptionID: String?) {
+    let fields = (((project["fields"] as? [String: Any])?["nodes"] as? [[String: Any]]) ?? [])
+    for field in fields where (field["name"] as? String)?.caseInsensitiveCompare("Status") == .orderedSame {
+        let options = field["options"] as? [[String: Any]] ?? []
+        let done = options.first { shadowDIsDoneish($0["name"] as? String) }
+        return (field["id"] as? String, done?["id"] as? String)
+    }
+    return (nil, nil)
+}
+
+func requiredOption(_ args: [String], _ option: String) throws -> String {
+    guard let value = optionValue(args, option), !value.isEmpty else {
+        throw AppError.usage("\(option) is required.")
+    }
+    return value
+}
+
 final class StateStore {
     private var db: OpaquePointer?
 
@@ -1793,6 +4160,7 @@ final class StateStore {
         try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: path).deletingLastPathComponent().path, withIntermediateDirectories: true)
         guard sqlite3_open(path, &db) == SQLITE_OK else { throw AppError.runtime("Unable to open SQLite database.") }
         try exec(Self.schema)
+        try migrate()
     }
 
     func close() {
@@ -1850,8 +4218,30 @@ final class StateStore {
       canonical_key text not null unique,
       reminder_external_id text,
       calendar_external_id text,
+      lark_task_guid text,
+      lark_task_url text,
       created_at text not null,
       updated_at text not null
+    );
+    create table if not exists sync_cursors (
+      id integer primary key autoincrement,
+      source text not null,
+      google_collection_id text not null,
+      cursor_type text not null,
+      cursor_value text not null,
+      updated_at text not null,
+      unique(source, google_collection_id, cursor_type)
+    );
+    create table if not exists sync_mappings (
+      id integer primary key autoincrement,
+      source text not null,
+      google_id text not null,
+      apple_kind text not null,
+      apple_external_id text not null,
+      google_etag text,
+      last_seen_at text not null,
+      deleted_at text,
+      unique(source, google_id, apple_kind)
     );
     """
 
@@ -1861,6 +4251,17 @@ final class StateStore {
             let message = error.map { String(cString: $0) } ?? "unknown SQLite error"
             sqlite3_free(error)
             throw AppError.runtime(message)
+        }
+    }
+
+    func migrate() throws {
+        let columns = try query("pragma table_info(projections)", [])
+        let names = Set(columns.compactMap { $0["name"] as? String })
+        if !names.contains("lark_task_guid") {
+            try exec("alter table projections add column lark_task_guid text")
+        }
+        if !names.contains("lark_task_url") {
+            try exec("alter table projections add column lark_task_url text")
         }
     }
 
@@ -1890,6 +4291,58 @@ final class StateStore {
         return sqlite3_last_insert_rowid(db)
     }
 
+    func pendingDecision(signalID: Int64) throws -> (id: Int64, decision: Decision)? {
+        guard let row = try queryOne(
+            """
+            select d.id, d.domain, d.priority, d.risk, d.needs_review, d.action, d.reason, d.confidence
+            from decisions d
+            left join actions a on a.decision_id=d.id
+            where d.signal_id=? and a.id is null
+            order by d.id desc
+            limit 1
+            """,
+            [signalID]
+        ) else {
+            return nil
+        }
+        let decision = Decision(
+            domain: row["domain"] as? String ?? "work",
+            priority: row["priority"] as? String ?? "normal",
+            risk: row["risk"] as? String ?? "low",
+            needsReview: (row["needs_review"] as? Int64 ?? 0) != 0,
+            action: row["action"] as? String ?? "record_only",
+            reason: row["reason"] as? String ?? "retry.pending",
+            confidence: row["confidence"] as? String ?? "low"
+        )
+        return (row["id"] as? Int64 ?? 0, decision)
+    }
+
+    func latestDryRunDecision(signalID: Int64) throws -> (id: Int64, decision: Decision)? {
+        guard let row = try queryOne(
+            """
+            select d.id, d.domain, d.priority, d.risk, d.needs_review, d.action, d.reason, d.confidence, a.status
+            from decisions d
+            join actions a on a.decision_id=d.id
+            where d.signal_id=?
+            order by a.id desc
+            limit 1
+            """,
+            [signalID]
+        ), row["status"] as? String == "dry_run" else {
+            return nil
+        }
+        let decision = Decision(
+            domain: row["domain"] as? String ?? "work",
+            priority: row["priority"] as? String ?? "normal",
+            risk: row["risk"] as? String ?? "low",
+            needsReview: (row["needs_review"] as? Int64 ?? 0) != 0,
+            action: row["action"] as? String ?? "record_only",
+            reason: row["reason"] as? String ?? "retry.dry_run",
+            confidence: row["confidence"] as? String ?? "low"
+        )
+        return (row["id"] as? Int64 ?? 0, decision)
+    }
+
     func recordAction(decisionID: Int64, result: ActionResult) throws -> Int64 {
         if let existing = try queryOne("select id from actions where decision_id=? order by id limit 1", [decisionID]) {
             return existing["id"] as? Int64 ?? 0
@@ -1908,39 +4361,107 @@ final class StateStore {
             "actions": try scalar("select count(*) from actions"),
             "executions": try scalar("select count(*) from executions"),
             "projections": try scalar("select count(*) from projections"),
+            "sync_cursors": try scalar("select count(*) from sync_cursors"),
+            "sync_mappings": try scalar("select count(*) from sync_mappings"),
             "pending_actions": try scalar("select count(*) from decisions d left join actions a on a.decision_id=d.id where a.id is null")
         ]
     }
 
+    func syncCursor(source: String, collectionID: String, cursorType: String) throws -> String? {
+        let row = try queryOne(
+            "select cursor_value from sync_cursors where source=? and google_collection_id=? and cursor_type=?",
+            [source, collectionID, cursorType]
+        )
+        return row?["cursor_value"] as? String
+    }
+
+    func recordSyncCursor(source: String, collectionID: String, cursorType: String, value: String?) throws {
+        guard let value, !value.isEmpty else { return }
+        try execPrepared(
+            """
+            insert into sync_cursors (source, google_collection_id, cursor_type, cursor_value, updated_at)
+            values (?, ?, ?, ?, ?)
+            on conflict(source, google_collection_id, cursor_type) do update set
+              cursor_value=excluded.cursor_value,
+              updated_at=excluded.updated_at
+            """,
+            [source, collectionID, cursorType, value, nowISO()]
+        )
+    }
+
+    func clearSyncCursor(source: String, collectionID: String, cursorType: String) throws {
+        try execPrepared(
+            "delete from sync_cursors where source=? and google_collection_id=? and cursor_type=?",
+            [source, collectionID, cursorType]
+        )
+    }
+
+    func syncMapping(source: String, googleID: String, appleKind: String) throws -> [String: Any]? {
+        try queryOne(
+            "select source, google_id, apple_kind, apple_external_id, google_etag, last_seen_at, deleted_at from sync_mappings where source=? and google_id=? and apple_kind=?",
+            [source, googleID, appleKind]
+        )
+    }
+
+    func recordSyncMapping(source: String, googleID: String, appleKind: String, appleExternalID: String, googleETag: String?) throws {
+        try execPrepared(
+            """
+            insert into sync_mappings (source, google_id, apple_kind, apple_external_id, google_etag, last_seen_at, deleted_at)
+            values (?, ?, ?, ?, ?, ?, null)
+            on conflict(source, google_id, apple_kind) do update set
+              apple_external_id=excluded.apple_external_id,
+              google_etag=excluded.google_etag,
+              last_seen_at=excluded.last_seen_at,
+              deleted_at=null
+            """,
+            [source, googleID, appleKind, appleExternalID, googleETag ?? NSNull(), nowISO()]
+        )
+    }
+
+    func markSyncMappingDeleted(source: String, googleID: String, appleKind: String) throws {
+        try execPrepared(
+            """
+            update sync_mappings
+            set deleted_at=?, last_seen_at=?
+            where source=? and google_id=? and apple_kind=?
+            """,
+            [nowISO(), nowISO(), source, googleID, appleKind]
+        )
+    }
+
     func projection(for canonicalKey: String) throws -> ProjectionRecord? {
-        guard let row = try queryOne("select canonical_key, reminder_external_id, calendar_external_id from projections where canonical_key=?", [canonicalKey]) else {
+        guard let row = try queryOne("select canonical_key, reminder_external_id, calendar_external_id, lark_task_guid, lark_task_url from projections where canonical_key=?", [canonicalKey]) else {
             return nil
         }
         return ProjectionRecord(
             canonicalKey: row["canonical_key"] as? String ?? canonicalKey,
             reminderExternalID: row["reminder_external_id"] as? String,
-            calendarExternalID: row["calendar_external_id"] as? String
+            calendarExternalID: row["calendar_external_id"] as? String,
+            larkTaskGUID: row["lark_task_guid"] as? String,
+            larkTaskURL: row["lark_task_url"] as? String
         )
     }
 
-    func recordProjection(canonicalKey: String, reminderExternalID: String?, calendarExternalID: String?) throws {
+    func recordProjection(canonicalKey: String, reminderExternalID: String?, calendarExternalID: String?, larkTaskGUID: String? = nil, larkTaskURL: String? = nil) throws {
         try execPrepared(
             """
-            insert into projections (canonical_key, reminder_external_id, calendar_external_id, created_at, updated_at)
-            values (?, ?, ?, ?, ?)
+            insert into projections (canonical_key, reminder_external_id, calendar_external_id, lark_task_guid, lark_task_url, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?)
             on conflict(canonical_key) do update set
               reminder_external_id=coalesce(excluded.reminder_external_id, projections.reminder_external_id),
               calendar_external_id=coalesce(excluded.calendar_external_id, projections.calendar_external_id),
+              lark_task_guid=coalesce(excluded.lark_task_guid, projections.lark_task_guid),
+              lark_task_url=coalesce(excluded.lark_task_url, projections.lark_task_url),
               updated_at=excluded.updated_at
             """,
-            [canonicalKey, reminderExternalID ?? NSNull(), calendarExternalID ?? NSNull(), nowISO(), nowISO()]
+            [canonicalKey, reminderExternalID ?? NSNull(), calendarExternalID ?? NSNull(), larkTaskGUID ?? NSNull(), larkTaskURL ?? NSNull(), nowISO(), nowISO()]
         )
     }
 
     func projections(limit: Int) throws -> [[String: Any]] {
         try query(
             """
-            select canonical_key, reminder_external_id, calendar_external_id, created_at, updated_at
+            select canonical_key, reminder_external_id, calendar_external_id, lark_task_guid, lark_task_url, created_at, updated_at
             from projections
             order by updated_at desc, id desc
             limit ?
@@ -1967,8 +4488,10 @@ final class StateStore {
             let canonicalKey = canonicalKeyFromStoredSignal(dedupeKey: row["dedupe_key"] as? String ?? "", metadataJSON: row["metadata_json"] as? String ?? "{}")
             let reminderID = externalID.split(separator: " ").map(String.init).first { $0.hasPrefix("x-apple-reminder://") }
             let calendarID = externalID.split(separator: " ").map(String.init).first { $0.hasPrefix("x-apple-calendar://") }
-            if reminderID != nil || calendarID != nil {
-                try recordProjection(canonicalKey: canonicalKey, reminderExternalID: reminderID, calendarExternalID: calendarID)
+            let larkURL = externalID.split(separator: " ").map(String.init).first { $0.contains("applink.feishu.cn/client/todo/task") }
+            let larkGUID = externalID.split(separator: " ").map(String.init).first { $0.hasPrefix("lark-task://") }?.replacingOccurrences(of: "lark-task://", with: "")
+            if reminderID != nil || calendarID != nil || larkURL != nil || larkGUID != nil {
+                try recordProjection(canonicalKey: canonicalKey, reminderExternalID: reminderID, calendarExternalID: calendarID, larkTaskGUID: larkGUID, larkTaskURL: larkURL)
                 rebuilt += 1
             }
         }
@@ -2239,6 +4762,8 @@ func launchdPlist(executable: String, configPath: String, projectRoot: String) -
       <true/>
       <key>RunAtLoad</key>
       <true/>
+      <key>LimitLoadToSessionType</key>
+      <string>Aqua</string>
       <key>WatchPaths</key>
       <array>
         <string>\(projectRoot)/var/inbox/events</string>
@@ -2262,16 +4787,38 @@ func shellOutput(_ args: [String]) throws -> String {
     try shellResult(args).output
 }
 
-func shellResult(_ args: [String]) throws -> (status: Int32, output: String) {
+func shellResult(_ args: [String], timeoutSeconds: TimeInterval? = nil) throws -> (status: Int32, output: String) {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = args
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = pipe
+    let outputURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("smart-shadow-shell-\(UUID().uuidString).log")
+    FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+    let outputHandle = try FileHandle(forWritingTo: outputURL)
+    defer {
+        try? outputHandle.close()
+        try? FileManager.default.removeItem(at: outputURL)
+    }
+    process.standardOutput = outputHandle
+    process.standardError = outputHandle
     try process.run()
-    process.waitUntilExit()
-    let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    if let timeoutSeconds {
+        let semaphore = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            process.waitUntilExit()
+            semaphore.signal()
+        }
+        if semaphore.wait(timeout: .now() + timeoutSeconds) == .timedOut {
+            process.terminate()
+            if semaphore.wait(timeout: .now() + 2) == .timedOut {
+                process.interrupt()
+            }
+        }
+    } else {
+        process.waitUntilExit()
+    }
+    try? outputHandle.synchronize()
+    let output = (try? String(contentsOf: outputURL, encoding: .utf8)) ?? ""
     return (process.terminationStatus, output)
 }
 
