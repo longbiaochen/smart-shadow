@@ -1,0 +1,16 @@
+{
+  "canonical_key": "apple_mail:fixture-record-001",
+  "source_id": "fixture-record-001",
+  "subject": "低价值通知",
+  "sender": "notice@example.com",
+  "received_at": "2026-06-04T08:10:00Z",
+  "mailbox": "INBOX",
+  "summary": "Codex automation judged this as background-only.",
+  "projection_target": "record_only",
+  "action": "record_only",
+  "domain": "work",
+  "priority": "low",
+  "risk": "low",
+  "reason": "codex_automation: no board projection needed.",
+  "suggested_action": "仅记录。"
+}

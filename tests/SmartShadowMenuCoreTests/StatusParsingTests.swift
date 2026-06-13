@@ -36,6 +36,12 @@ import Testing
     #expect(snapshot.errorMessage?.contains("service-status") == true)
 }
 
+@Test func controlClientDefaultsToProjectRootInsteadOfLaunchDirectory() {
+    let client = SmartShadowControlClient()
+
+    #expect(client.projectRoot == "/Users/longbiao/Projects/smart-shadow")
+}
+
 enum SelfFixtures {
     static let healthy = """
     {

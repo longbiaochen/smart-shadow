@@ -1,0 +1,179 @@
+name: SmartShadow
+options:
+  bundleIdPrefix: me.longbiaochen
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: YRQ5DV25KM
+    CODE_SIGN_STYLE: Automatic
+packages: {}
+targets:
+  SmartShadowGitHubAPI_iOS:
+    type: framework
+    platform: iOS
+    supportedDestinations:
+      - iOS
+      - iOS Simulator
+    deploymentTarget: "17.0"
+    sources:
+      - Sources/SmartShadowGitHubAPI
+    settings:
+      base:
+        PRODUCT_NAME: SmartShadowGitHubAPI
+        PRODUCT_MODULE_NAME: SmartShadowGitHubAPI
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow.github-api
+        GENERATE_INFOPLIST_FILE: YES
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+    scheme: {}
+  SmartShadowGitHubAPI_macOS:
+    type: framework
+    platform: macOS
+    supportedDestinations:
+      - macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/SmartShadowGitHubAPI
+    settings:
+      base:
+        PRODUCT_NAME: SmartShadowGitHubAPI
+        PRODUCT_MODULE_NAME: SmartShadowGitHubAPI
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow.github-api.macos
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+    scheme: {}
+  SmartShadowShared_iOS:
+    type: framework
+    platform: iOS
+    supportedDestinations:
+      - iOS
+      - iOS Simulator
+    deploymentTarget: "17.0"
+    sources:
+      - Sources/SmartShadowShared
+    settings:
+      base:
+        PRODUCT_NAME: SmartShadowShared
+        PRODUCT_MODULE_NAME: SmartShadowShared
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow.shared.ios
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+        GENERATE_INFOPLIST_FILE: YES
+    scheme: {}
+  SmartShadowShared:
+    type: framework
+    platform: macOS
+    supportedDestinations:
+      - macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/SmartShadowShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow.shared
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+    scheme: {}
+  SmartShadowCompanionMac:
+    type: application
+    platform: macOS
+    supportedDestinations:
+      - macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/SmartShadowCompanionMac
+    dependencies:
+      - target: SmartShadowGitHubAPI_macOS
+      - target: SmartShadowShared
+      - sdk: Speech.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow.companion
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_DEBUG_DYLIB: NO
+        INFOPLIST_KEY_LSUIElement: NO
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: SmartShadow records voice input for local transcription and user-confirmed GitHub task submission.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: SmartShadow transcribes voice commands into reviewable GitHub operation suggestions.
+        INFOPLIST_KEY_GitHubOAuthClientID: "$(SMART_SHADOW_GITHUB_CLIENT_ID)"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+    scheme:
+      testTargets:
+        - SmartShadowCompanionMacUITests
+  SmartShadowCompanionMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    supportedDestinations:
+      - macOS
+    deploymentTarget: "14.0"
+    sources:
+      - tests/SmartShadowCompanionMacUITests
+    dependencies:
+      - target: SmartShadowCompanionMac
+  SmartShadowIOS:
+    type: application
+    platform: iOS
+    supportedDestinations:
+      - iOS
+      - iOS Simulator
+    deploymentTarget: "17.0"
+    sources:
+      - Sources/SmartShadowIOS
+    dependencies:
+      - target: SmartShadowGitHubAPI_iOS
+      - target: SmartShadowShared_iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.longbiaochen.smart-shadow
+        INFOPLIST_FILE: Sources/SmartShadowIOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/SmartShadowIOS/SmartShadowIOS.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1"
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+        SMART_SHADOW_GITHUB_CLIENT_ID: ""
+    scheme:
+      testTargets:
+        - SmartShadowIOSTests
+        - SmartShadowIOSUITests
+  SmartShadowIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    supportedDestinations:
+      - iOS
+      - iOS Simulator
+    deploymentTarget: "17.0"
+    settings:
+      base:
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1"
+    sources:
+      - tests/SmartShadowIOSTests
+    dependencies:
+      - target: SmartShadowIOS
+      - target: SmartShadowGitHubAPI_iOS
+      - target: SmartShadowShared_iOS
+  SmartShadowIOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    supportedDestinations:
+      - iOS
+      - iOS Simulator
+    deploymentTarget: "17.0"
+    settings:
+      base:
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1"
+    sources:
+      - tests/SmartShadowIOSUITests
+    dependencies:
+      - target: SmartShadowIOS

@@ -1,0 +1,16 @@
+{
+  "canonical_key": "apple_mail:fixture-work-001",
+  "source_id": "fixture-work-001",
+  "subject": "厦大课程建设材料确认",
+  "sender": "teacher@xmu.edu.cn",
+  "received_at": "2026-06-04T08:00:00Z",
+  "mailbox": "INBOX",
+  "summary": "Codex automation judged this as team course-work mail.",
+  "projection_target": "apple_reminder",
+  "action": "create_review_reminder",
+  "domain": "work",
+  "priority": "high",
+  "risk": "medium",
+  "reason": "codex_automation: team course-work mail stays on Apple Reminders WORK list.",
+  "suggested_action": "确认课程材料并在 WORK 清单里跟进。"
+}

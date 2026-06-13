@@ -19,7 +19,7 @@ For local verification, start with:
 
 ```bash
 cp config/smart-shadow.example.json config/smart-shadow.json
-swift build --product smart-shadow-mac-core
+swift build --product shadowd
 bin/shadowd once --dry-run
 ```
 

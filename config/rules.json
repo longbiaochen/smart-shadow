@@ -2,22 +2,23 @@
   "version": 1,
   "domain_rules": {
     "health": ["健康", "睡眠", "运动", "饮食", "体检", "医生", "医院", "焦虑", "心理", "健身"],
-    "money": ["钱", "回款", "收入", "付款", "发票", "报销", "工资", "投资", "理财", "合同", "客户", "项目款", "成本", "预算"],
+    "money": ["钱", "回款", "收入", "付款", "发票", "报销", "工资", "投资", "理财", "合同", "客户", "项目款", "成本", "预算", "账单", "续费", "域名到期", "订阅扣费", "扣费", "billing", "invoice", "renewal"],
     "relationship": ["家人", "父母", "老婆", "爱人", "朋友", "同学", "感谢", "拜访", "礼物", "关系", "沟通", "约饭"],
     "work": ["工作", "项目", "会议", "交付", "开发", "代码", "github", "飞书", "文档", "汇报", "评审", "部署"]
   },
   "source_default_domains": {
     "apple_mail_summary": "work",
-    "apple_mail_app": "work",
     "apple_reminders_inbox": "work",
     "chrome_bookmarks": "work",
-    "lark_daily_context": "work"
+    "lark_daily_context": "work",
+    "lark_calendar_events": "work",
+    "lark_tasks": "work"
   },
   "rules": [
     {
       "rule_id": "safety.high_risk_boundary",
       "scope": "global",
-      "triggers": ["支付", "转账", "投资", "借贷", "合同", "承诺", "发送", "回复", "公开", "发布", "删除", "隐私", "账号", "密码", "医疗", "法律"],
+      "triggers": ["支付", "转账", "投资", "借贷", "合同", "承诺", "发送", "回复", "公开", "发布", "删除", "隐私", "账号", "密码", "医疗", "法律", "账单", "续费", "域名到期", "订阅扣费", "扣费", "发票", "报销", "billing", "invoice", "renewal", "account", "security"],
       "domain": null,
       "priority": "high",
       "risk": "high",
@@ -27,9 +28,35 @@
       "rationale": "命中高风险边界，需要用户审核后才能对外或不可逆执行。"
     },
     {
+      "rule_id": "sync.lark_calendar_events",
+      "scope": "source",
+      "sources": ["lark_calendar_events"],
+      "triggers": [],
+      "domain": null,
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "sync_projection",
+      "confidence": "high",
+      "rationale": "飞书日程是明确时间占用，按结构化字段同步到 Apple Calendar。"
+    },
+    {
+      "rule_id": "sync.lark_tasks",
+      "scope": "source",
+      "sources": ["lark_tasks"],
+      "triggers": [],
+      "domain": "work",
+      "priority": "normal",
+      "risk": "low",
+      "needs_review": false,
+      "action": "sync_projection",
+      "confidence": "high",
+      "rationale": "飞书任务是可完成事项，按结构化字段只同步到 Apple Reminders。"
+    },
+    {
       "rule_id": "value.mail_editorial_work",
       "scope": "source",
-      "sources": ["apple_mail_summary", "apple_mail_app"],
+      "sources": ["apple_mail_summary"],
       "triggers": ["editor assignment", "reviewer agrees", "required reviews complete", "made a decision", "manuscript submitted", "new manuscript"],
       "domain": "work",
       "priority": "high",
@@ -42,8 +69,8 @@
     {
       "rule_id": "value.source_specific",
       "scope": "source",
-      "sources": ["apple_mail_summary", "apple_mail_app", "chrome_bookmarks", "lark_daily_context", "apple_reminders_inbox"],
-      "triggers": ["合同", "付款", "发票", "客户", "deadline", "due", "blocked", "阻塞", "会议", "待办", "交付", "评审", "project", "github", "paper", "论文", "项目", "副业", "赚钱"],
+      "sources": ["apple_mail_summary", "chrome_bookmarks", "lark_daily_context", "lark_calendar_events", "lark_tasks", "apple_reminders_inbox"],
+      "triggers": ["合同", "付款", "发票", "客户", "deadline", "due", "blocked", "阻塞", "会议", "待办", "交付", "评审", "review", "project", "github", "paper", "论文", "项目", "副业", "赚钱", "回款", "账单", "续费", "报销", "域名到期", "订阅扣费", "项目款", "部署", "学校流程"],
       "domain": null,
       "priority": "high",
       "risk": "medium",
@@ -55,7 +82,7 @@
     {
       "rule_id": "value.life_mainline",
       "scope": "global",
-      "triggers": ["回款", "收入", "健康", "睡眠", "客户", "交付", "阻塞", "家人", "关系", "审核", "授权", "确认"],
+      "triggers": ["回款", "收入", "健康", "睡眠", "客户", "交付", "阻塞", "家人", "关系", "审核", "授权", "确认", "账单", "续费", "发票", "报销", "合同", "账号", "安全", "部署", "论文", "学校流程"],
       "domain": null,
       "priority": "high",
       "risk": "medium",
@@ -92,7 +119,7 @@
     {
       "rule_id": "background.apple_mail_summary",
       "scope": "source",
-      "sources": ["apple_mail_summary", "apple_mail_app"],
+      "sources": ["apple_mail_summary"],
       "triggers": [],
       "domain": "work",
       "priority": "normal",

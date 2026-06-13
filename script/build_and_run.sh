@@ -2,10 +2,11 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="SmartShadowMenu"
-PRODUCT_NAME="smart-shadow-menu"
-BUNDLE_ID="me.longbiaochen.smart-shadow.menu"
+APP_NAME="SmartShadowCompanion"
+PRODUCT_NAME="smart-shadow-companion-mac"
+BUNDLE_ID="me.longbiaochen.smart-shadow.companion"
 MIN_SYSTEM_VERSION="14.0"
+OAUTH_CLIENT_ID="${SMART_SHADOW_GITHUB_CLIENT_ID:-}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -44,8 +45,12 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$MIN_SYSTEM_VERSION</string>
   <key>LSUIElement</key>
   <true/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>SmartShadow records voice packets that are uploaded to life-os/inbox.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>GitHubOAuthClientID</key>
+  <string>$OAUTH_CLIENT_ID</string>
 </dict>
 </plist>
 PLIST

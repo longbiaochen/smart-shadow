@@ -38,6 +38,15 @@ cat > "$FIXTURE" <<'EOF'
   "items": [
     {
       "repo": "longbiaochen/life-os",
+      "number": 123,
+      "title": "新任务",
+      "state": "OPEN",
+      "project_status": "Todo",
+      "labels": ["smart-shadow", "shadow:inbox"],
+      "body": "请实现本地语音提交 GitHub issue。\n\n---\n\n<!-- smart-shadow\nsource: macos\ninput: voice\naudio: not_uploaded\ncreated_by: user\nshadow_status: inbox\n-->\n"
+    },
+    {
+      "repo": "longbiaochen/life-os",
       "number": 225,
       "title": "Buy milk and schedule planning review",
       "state": "OPEN",
@@ -95,8 +104,26 @@ if ! rg -q '"requires_smartshadow_label"[[:space:]]*:[[:space:]]*false' "$TMP_DI
   exit 1
 fi
 
-if ! rg -q '"reason"[[:space:]]*:[[:space:]]*"voice_issue_already_ready"' "$TMP_DIR/reconcile.json"; then
-  echo "expected #225-style voice issue to no-op when already ready"
+if ! rg -q '"reason"[[:space:]]*:[[:space:]]*"legacy_voice_audio_needs_final_text"' "$TMP_DIR/reconcile.json"; then
+  echo "expected #225-style legacy audio issue to request final text instead of waiting for transcription"
+  cat "$TMP_DIR/reconcile.json"
+  exit 1
+fi
+
+if ! rg -q 'Smart Shadow no longer processes raw audio in shadowd' "$TMP_DIR/reconcile.json"; then
+  echo "expected legacy audio clarification to mention shadowd raw-audio boundary"
+  cat "$TMP_DIR/reconcile.json"
+  exit 1
+fi
+
+if ! rg -q '"reason"[[:space:]]*:[[:space:]]*"smart_shadow_text_issue_ready_for_triage"' "$TMP_DIR/reconcile.json"; then
+  echo "expected final-text SmartShadow issue to plan triage handoff"
+  cat "$TMP_DIR/reconcile.json"
+  exit 1
+fi
+
+if ! rg -q '"to_label"[[:space:]]*:[[:space:]]*"shadow:triaging"' "$TMP_DIR/reconcile.json"; then
+  echo "expected final-text SmartShadow issue to move to shadow:triaging"
   cat "$TMP_DIR/reconcile.json"
   exit 1
 fi

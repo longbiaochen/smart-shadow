@@ -17,6 +17,7 @@ Usage: bin/shadowd <command>
 Commands:
   once [--dry-run] [--fixture PATH]       Reconcile the Life OS GitHub Project once
   run                                     Run the Swift GitHub Project reconciler loop
+  github-issue --payload PATH             Handle one GitHub issue event payload
   inspect-issue [--issue N] [--fixture P] Inspect one Project issue plan
   render-plist [--stdout]                 Render the LaunchAgent plist
   install                                 Install and bootstrap the user LaunchAgent
@@ -40,14 +41,12 @@ shadowd_config() {
 }
 
 ensure_core() {
-  if [[ ! -x "$ROOT_DIR/.build/debug/smart-shadow-mac-core" ]]; then
-    swift build --package-path "$ROOT_DIR" --product smart-shadow-mac-core >/dev/null
-  fi
+  swift build --package-path "$ROOT_DIR" --product shadowd >/dev/null
 }
 
 run_core() {
   ensure_core
-  exec "$ROOT_DIR/.build/debug/smart-shadow-mac-core" --config "$(shadowd_config)" shadowd "$@"
+  exec "$ROOT_DIR/.build/debug/shadowd" --config "$(shadowd_config)" "$@"
 }
 
 render_plist() {
@@ -94,7 +93,7 @@ shift || true
 
 case "$command" in
   ""|-h|--help|help) usage ;;
-  once|run|inspect-issue) run_core "$command" "$@" ;;
+  once|run|github-issue|inspect-issue) run_core "$command" "$@" ;;
   render-plist)
     if [[ "$#" -gt 0 && "$*" != "--stdout" ]]; then
       usage

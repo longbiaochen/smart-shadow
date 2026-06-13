@@ -4,9 +4,7 @@ import SmartShadowMenuCore
 
 @MainActor
 final class StatusPanelStore: ObservableObject {
-    @Published private(set) var snapshot = MenuSnapshot.failure(
-        CommandExecutionError(command: "initial refresh", status: 1, output: "waiting")
-    )
+    @Published private(set) var snapshot = MenuSnapshot.initial()
     @Published private(set) var isWorking = false
     @Published var lastActionMessage: String?
 
@@ -58,7 +56,7 @@ final class StatusPanelStore: ObservableObject {
             _ = try client.openPath(path)
             lastActionMessage = "已打开 \(URL(fileURLWithPath: path).lastPathComponent)"
         } catch {
-            snapshot = .failure(error)
+            snapshot = snapshot.withError(error)
         }
     }
 
@@ -74,7 +72,7 @@ final class StatusPanelStore: ObservableObject {
             snapshot = next
             lastActionMessage = successMessage
         } catch {
-            snapshot = .failure(error)
+            snapshot = snapshot.withError(error)
             lastActionMessage = nil
         }
     }

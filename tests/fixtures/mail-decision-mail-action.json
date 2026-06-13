@@ -1,0 +1,16 @@
+{
+  "canonical_key": "apple_mail:fixture-archive-001",
+  "source_id": "fixture-archive-001",
+  "subject": "Newsletter promotion",
+  "sender": "newsletter@example.com",
+  "received_at": "2026-06-04T08:15:00Z",
+  "mailbox": "INBOX",
+  "summary": "Codex automation judged this as safe to archive.",
+  "projection_target": "mail_action",
+  "action": "archive_low_value",
+  "domain": "work",
+  "priority": "low",
+  "risk": "low",
+  "reason": "codex_automation: low-value newsletter.",
+  "suggested_action": "归档。"
+}

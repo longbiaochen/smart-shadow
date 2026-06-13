@@ -5,6 +5,16 @@ import { defaultConfig } from "../../src/config.js";
 import { CodexThreads } from "../../src/codex/threads.js";
 import { Registry } from "../../src/shadow/registry.js";
 
+const smartShadowConfig = {
+  ...defaultConfig,
+  codex: {
+    ...defaultConfig.codex,
+    defaultCwd: "/repo/smart-shadow",
+    mainProjectKey: "smart-shadow",
+    dispatcherThreadTitle: "shadowd-router"
+  }
+};
+
 test("startThread extracts nested thread id from Codex AppServer response", async () => {
   const client = {
     onNotification: () => undefined,
@@ -54,12 +64,12 @@ test("waitForTurnCompleted returns aggregated agent message deltas", async () =>
   assert.equal((await wait).finalText, "{\"action\":\"reply_only\"}");
 });
 
-test("ensureMainThread replaces stale or non-Chats registry thread ids", async () => {
+test("ensureMainThread replaces stale or non-Smart Shadow registry thread ids", async () => {
   const registry = new Registry(":memory:");
   await registry.load();
   registry.setMainThread({
     threadId: "550e8400-e29b-41d4-a716-446655440000",
-    cwd: ".",
+    cwd: "",
     title: "smart-shadow-main"
   });
   const methods: string[] = [];
@@ -74,21 +84,21 @@ test("ensureMainThread replaces stale or non-Chats registry thread ids", async (
       return {};
     }
   };
-  const threads = new CodexThreads(client as never, defaultConfig);
+  const threads = new CodexThreads(client as never, smartShadowConfig);
 
   assert.equal(await threads.ensureMainThread(registry), "650e8400-e29b-41d4-a716-446655440000");
   assert.deepEqual(methods, ["thread/start"]);
-  assert.deepEqual(requests[0]?.params, { title: "shadowd-router" });
+  assert.deepEqual(requests[0]?.params, { cwd: "/repo/smart-shadow", title: "shadowd-router" });
   assert.equal(registry.getMainThread()?.threadId, "650e8400-e29b-41d4-a716-446655440000");
-  assert.equal(registry.getMainThread()?.cwd, "");
+  assert.equal(registry.getMainThread()?.cwd, "/repo/smart-shadow");
 });
 
-test("ensureMainThread reuses the current Chats router thread", async () => {
+test("ensureMainThread reuses the current Smart Shadow router thread", async () => {
   const registry = new Registry(":memory:");
   await registry.load();
   registry.setMainThread({
     threadId: "550e8400-e29b-41d4-a716-446655440000",
-    cwd: "",
+    cwd: "/repo/smart-shadow",
     title: "shadowd-router"
   });
   const methods: string[] = [];
@@ -99,7 +109,7 @@ test("ensureMainThread reuses the current Chats router thread", async () => {
       return {};
     }
   };
-  const threads = new CodexThreads(client as never, defaultConfig);
+  const threads = new CodexThreads(client as never, smartShadowConfig);
 
   assert.equal(await threads.ensureMainThread(registry), "550e8400-e29b-41d4-a716-446655440000");
   assert.deepEqual(methods, ["thread/resume"]);

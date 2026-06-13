@@ -19,9 +19,9 @@ cat <<'JSON'
   {
     "source_id": "mail-app-low-value-001",
     "sender": "newsletter@example.com",
-    "subject": "Newsletter 低价值 订阅 update",
-    "summary": "A subscription newsletter with no user action needed.",
-    "body": "Subscription newsletter body. No reply or review is needed.",
+    "subject": "Newsletter 低价值 订阅 优惠券",
+    "summary": "A subscription promotion with no user action needed.",
+    "body": "Subscription promotion body. No user action is needed.",
     "mailbox": "INBOX",
     "received_at": "2026-06-02T09:00:00Z"
   }

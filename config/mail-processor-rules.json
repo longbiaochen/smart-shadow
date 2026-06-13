@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "source": "migrated from /Users/longbiao/.codex/automations/mail-processor/memory.md",
+  "review_required_senders": {
+    "10000@qq.com": "QQ anti-fraud and security notices are identity-sensitive.",
+    "294707284@qq.com": "XMU experimental-teaching reimbursement notices carry school workflow and funding deadlines.",
+    "2577452435@qq.com": "Repeated XMU thesis-forwarding requests are direct school-workflow collaboration mail.",
+    "abubakar.zakari@hotmail.com": "Special-issue proposal follow-up addressed to journal editors is editorial/collaboration sensitive.",
+    "ae.arachie@hotmail.com": "Special-issue proposal follow-up addressed to journal editors is editorial/collaboration sensitive.",
+    "an_dakiche@esi.dz": "Direct manuscript-status inquiry for BDR-D-25-00837 is editorial workflow sensitive.",
+    "authorsupport@elsevier.com": "Elsevier Researcher Support / Big Data Research escalation mail is editorial-workflow sensitive.",
+    "aukzllyy@scut.edu.cn": "CCTA review-notification / reminder mail is academic deadline-sensitive.",
+    "boczhangdan@bankofchina.com": "Bank of China credit-card e-statements are billing-sensitive.",
+    "chenlei@xmu.edu.cn": "XMU research/cooperation notices often carry near-term school-workflow deadlines.",
+    "control@academicscholar.net": "Conference-solicitation mail required account password before unsubscribe; keep on manual-review surface.",
+    "cyq1015@xmu.edu.cn": "XMU graduate-education / thesis-workflow notices need human school-workflow review.",
+    "do-not-reply@springernature.com": "Springer Nature reviewer invitations and reminders are time-bound editorial work.",
+    "dr.rameshkumarayyasamy@outlook.com": "Associate Editor follow-ups target Big Data Research editors and need human judgment.",
+    "em@editorialmanager.com": "Editorial Manager submission and reviewer-decline notices are editorial-workflow sensitive.",
+    "fernaznn@gmail.com": "Direct Big Data Research special-issue follow-up is editorial/collaboration sensitive.",
+    "gitlab@crowdsensing.cn": "GitLab instance account-request mail is business/permission-sensitive.",
+    "imwut26b@precisionconference.com": "IMWUT confirmations and missing-required-items notices are academic deadline-sensitive.",
+    "jira@hostpointsupport.atlassian.net": "BeoBank / Hostpoint account-action notices can be billing/account sensitive.",
+    "jorge.parraga@usach.cl": "Direct manuscript-status escalation asks for review status, timeline, or withdrawal path.",
+    "no-reply@ceki.me": "Verification-code mail can indicate active account signup or sign-in attempts.",
+    "no-reply@cursor.sh": "Cursor sign-up code or password-reset mail is identity-sensitive.",
+    "no-reply@slack.com": "Slack retention / content-deletion notices are workspace-data-risk sensitive.",
+    "no-reply@supportnoreply.fincept.in": "Fincept onboarding / credential mail carries OTP or API keys.",
+    "no_reply@email.apple.com": "Apple receipts and subscription-renewal receipts are billing/account sensitive.",
+    "noreply@easychair.org": "EasyChair program-committee / review-service invitations are academic collaboration and deadline-sensitive.",
+    "noreply@github.com": "GitHub account token, OAuth, and security notices are security-sensitive.",
+    "noreply@tm.openai.com": "OpenAI authentication-code mail is identity-sensitive.",
+    "oki2525@yahoo.com": "Repeated special-issue proposal follow-up addressed to Big Data Research editors is sensitive.",
+    "renewal@acm.org": "ACM membership renewal / lapse notices carry billing and professional-membership decisions.",
+    "service@paypal.com": "PayPal receipts for Apple Services charges are billing-sensitive.",
+    "shweta.kharya@hotmail.com": "Associate Editor application to Big Data Research is editorial/collaboration sensitive.",
+    "system@notice.aliyun.com": "Aliyun domain-expiry warnings carry billing and business-continuity risk.",
+    "team@termius.com": "Termius account-security / encryption-password-reset mail is security-sensitive.",
+    "unanyusmaniaroktiawati@outlook.com": "Special-issue proposal follow-up addressed to journal editors is editorial/collaboration sensitive.",
+    "webmaster@icbc.com.cn": "ICBC credit-card contract-text notices are billing/contract sensitive.",
+    "xmucwcfp@xmu.edu.cn": "XMU fiscal e-invoice mail carries billing or reimbursement evidence.",
+    "z16638152513@foxmail.com": "Standards-drafting / pre-research outreach is collaboration-sensitive."
+  },
+  "auto_archive_patterns": [
+    {
+      "sender": "scholaralerts-noreply@google.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Google Scholar citation/article digest."
+    },
+    {
+      "sender": "scholarcitations-noreply@google.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Google Scholar follow/profile reminder mail."
+    },
+    {
+      "sender": "postmaster@xmu.edu.cn",
+      "subject_contains": ["CACTER邮件安全网关隔离区邮件通知目录摘要"],
+      "body_contains": [],
+      "reason": "XMU quarantine digest is informational unless an exception or high-risk sender is visible."
+    },
+    {
+      "sender": "noreply@acm.org",
+      "subject_contains": ["Quarantine Notification"],
+      "body_contains": [],
+      "reason": "ACM quarantine digest is informational unless the body names a high-risk thread."
+    },
+    {
+      "sender": "hello@hello.scribd.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Scribd trial / promo mail."
+    },
+    {
+      "sender": "noreply@polymarket.com",
+      "subject_contains": ["Breaking News in The Last 24hrs"],
+      "body_contains": [],
+      "reason": "Polymarket news digest."
+    },
+    {
+      "sender": "updates@taskade.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Taskade product update / marketing mail."
+    },
+    {
+      "sender": "hello@tradingview.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "TradingView trial / promo / sale mail."
+    },
+    {
+      "sender": "mail@ifttt.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "IFTTT product announcement / marketing mail."
+    },
+    {
+      "sender": "announcements@figma.com",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Figma product announcement mail."
+    },
+    {
+      "sender": "noreply@email.openai.com",
+      "subject_contains": ["product", "plan"],
+      "body_contains": [],
+      "reason": "OpenAI product announcement / plan marketing mail."
+    },
+    {
+      "sender": "stitch-noreply@google.com",
+      "subject_contains": ["Stitch"],
+      "body_contains": [],
+      "reason": "Google Stitch product or design-system announcement."
+    },
+    {
+      "sender": "team@m.ngrok.com",
+      "subject_contains": ["[ngrok news]"],
+      "body_contains": [],
+      "reason": "ngrok product/newsletter mail."
+    },
+    {
+      "domain": "bilpublishing.net",
+      "subject_contains": ["Scopus Digital Technology Journal"],
+      "body_contains": [],
+      "reason": "Repeated low-value academic/editorial solicitation."
+    },
+    {
+      "subject_contains": ["Peer Review: Publication Your Papers in Scopus Indexed Journal"],
+      "body_contains": [],
+      "reason": "Repeated generic Scopus publication pitch."
+    },
+    {
+      "subject_contains": ["Submit Your Research to Advanced Science Publication Journal"],
+      "body_contains": [],
+      "reason": "Repeated generic Scopus/open-access pitch."
+    },
+    {
+      "sender": "sc@world-comp.org",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "Repeated conference CFP solicitation; reply-based unsubscribe is not safe."
+    },
+    {
+      "sender": "welcome@openrouter.ai",
+      "subject_contains": ["Welcome to OpenRouter"],
+      "body_contains": [],
+      "reason": "OpenRouter onboarding / marketing mail."
+    },
+    {
+      "sender": "elhadi.shakshuki@acadiau.ca",
+      "subject_contains": [],
+      "body_contains": [],
+      "reason": "EUSPN / ICTH workshop-organizer solicitation."
+    }
+  ],
+  "auto_unsubscribe_senders": {
+    "garry@events.garryslist.org": "One-click List-Unsubscribe POST returned HTTP 200 on 2026-05-05.",
+    "garry@news.garryslist.org": "One-click List-Unsubscribe POST returned HTTP 200 on 2026-05-04.",
+    "hello@ollama.com": "Previously confirmed safe sender-level unsubscribe.",
+    "hello@tab-trader.com": "Previously confirmed safe sender-level unsubscribe.",
+    "iccste2026@ei.ieeeenotice.com": "SendCloud unsubscribe confirmation returned success on 2026-05-07.",
+    "ieee-cis@deliver.ieee.org": "First-party connect.ieee.org one-click unsubscribe confirmed on 2026-05-14.",
+    "ieee@deliver.ieee.org": "Previously confirmed safe sender-level unsubscribe.",
+    "km.icctis.org": "Previously confirmed safe sender/domain-level unsubscribe.",
+    "notifications@mail.postman.com": "SendGrid one-click unsubscribe returned HTTP 200 on 2026-05-06.",
+    "ship@info.vercel.com": "Safe visible unsubscribe path rendered an Inflection confirmation page.",
+    "welcome@openrouter.ai": "First-party OpenRouter unsubscribe path confirmed on 2026-05-12."
+  },
+  "junk_candidates": {
+    "18092689780@189.cn": "Workstation / cluster hardware marketing solicitation.",
+    "321599565@qq.com": "Patent-purchase solicitation with no safe unsubscribe path visible.",
+    "amruthapual@gmail.com": "Generic Scopus/UGC paid-publication solicitation.",
+    "articless76@gmail.com": "Generic Scopus / Web of Science publication solicitation.",
+    "atriojournal.com": "Generic Atrio Journal Scopus solicitation.",
+    "av@mail4.kateandscoop.com": "Fake Rakuten card / PayPay emergency-payment phish.",
+    "baamboozle.one": "Low-value bathroom-remodel promo domain.",
+    "cacmsac.cn": "Repeated conference / institute-outreach solicitation domain.",
+    "gdcombine.com": "Fake Rakuten card / PayPay payment phish.",
+    "gcke-gcke5.com": "Repeated conference-invite spam domain.",
+    "gcke2026-congress.com": "Low-value conference-invite domain.",
+    "guochenvideowu.com": "Rotating pension / PayPay extortion phish domain.",
+    "homeposts.online": "Third-party Budget Blinds promo with off-domain unsubscribe.",
+    "iag@vm.gov.cn": "Phish-style fake OA task notice.",
+    "journalinformetrics.com": "Repeated low-value publication solicitation.",
+    "lauren.t@devthusiastnotes.com": "Repeated pseudo-personalized Devthusiast pitch.",
+    "pkueducn.cn": "Repeated same-template Claude Code seminar outreach.",
+    "publicationrecovery70@gmail.com": "Low-value publication solicitation.",
+    "rameshresearchers@gmail.com": "Generic Scopus/Ugc journal solicitation.",
+    "submissionjournal8@gmail.com": "Generic library/information science Scopus solicitation.",
+    "tourism@juniperresearch.org": "Low-value fast-publication / tourism-journal solicitation.",
+    "weijun@aicnedu.cn": "Paid Python data-analysis workshop solicitation.",
+    "windowsplanning.online": "Low-value home-insurance quote spam domain.",
+    "zxhydonghua@263.net": "Oversized grant / PPT beautification spam."
+  },
+  "suppressed_senders": {},
+  "exceptions_and_reversals": [
+    {
+      "sender_or_domain": "noreply@acm.org",
+      "correction": "Flag the quarantine notification for review when it surfaces a quarantined high-risk collaboration/editorial sender.",
+      "reason": "Quarantine digests can act as preservation alerts."
+    },
+    {
+      "sender_or_domain": "no-reply@ceki.me",
+      "correction": "Treat verification mail carrying a live code and Wasn't you guidance as identity-sensitive even if Mail places it in Junk.",
+      "reason": "These messages can indicate active account-signup or sign-in attempts."
+    }
+  ]
+}

@@ -3,4 +3,5 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
-exec .build/debug/smart-shadow-mac-core "$@"
+swift build --package-path "$ROOT_DIR" --product shadowd >/dev/null
+exec .build/debug/shadowd "$@"

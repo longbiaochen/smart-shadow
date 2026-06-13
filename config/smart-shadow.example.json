@@ -1,7 +1,43 @@
 {
   "runtime_root": "var",
   "rules_file": "config/rules.json",
+  "google": {
+    "oauth_client_id": "",
+    "oauth_scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/tasks.readonly",
+      "https://www.googleapis.com/auth/contacts.readonly"
+    ]
+  },
   "poll_seconds": 10,
+  "github": {
+    "enabled": true,
+    "agentName": "shadow",
+    "daemonName": "shadowd",
+    "assignee": "shadow",
+    "allowedCommentCommands": [
+      "@shadow",
+      "@shadow fix",
+      "@shadow continue",
+      "@shadow test",
+      "@shadow explain"
+    ],
+    "events": [
+      "issues",
+      "issue_comment"
+    ],
+    "repos": {
+      "longbiaochen/smart-shadow": {
+        "localPath": "/Users/longbiao/Projects/smart-shadow",
+        "defaultBase": "main",
+        "allowedSenders": [
+          "longbiaochen"
+        ],
+        "testCommand": "bin/smart-shadow-test",
+        "codexSandbox": "workspace-write"
+      }
+    }
+  },
   "sources": {
     "event_inbox": "inbox/events",
     "file_metadata": {
@@ -12,6 +48,7 @@
       ],
       "max_age_hours": 24,
       "max_items": 25,
+      "timeout_seconds": 5,
       "ignore_names": [
         ".DS_Store"
       ]
@@ -40,6 +77,72 @@
       "max_items_per_command": 20,
       "max_body_chars": 4000
     },
+    "lark_calendar_events": {
+      "enabled": false,
+      "argv": [
+        "lark-cli",
+        "calendar",
+        "+agenda",
+        "--as",
+        "user",
+        "--format",
+        "json"
+      ],
+      "timeout_seconds": 20,
+      "window_past_days": 1,
+      "window_future_days": 7,
+      "chunk_days": 7,
+      "max_items": 100,
+      "primary_calendar_summary": "陈龙彪",
+      "source_calendar_domains": {
+        "陈龙彪": "work",
+        "应酬": "relationship"
+      },
+      "extra_calendar_summaries": [
+        "应酬"
+      ]
+    },
+    "lark_tasks": {
+      "enabled": false,
+      "argv": [
+        "lark-cli",
+        "task",
+        "+get-my-tasks",
+        "--as",
+        "user",
+        "--complete=false",
+        "--page-all",
+        "--format",
+        "json"
+      ],
+      "timeout_seconds": 20,
+      "max_items": 100
+    },
+    "google_calendar_events": {
+      "enabled": false,
+      "calendar_ids": [
+        "primary"
+      ],
+      "time_min": "2026-06-01T00:00:00+08:00",
+      "time_max": "2026-07-31T23:59:59+08:00",
+      "page_size": 250,
+      "max_items": 100,
+      "apple_calendar_names": {
+        "primary": "Google - Primary"
+      }
+    },
+    "google_tasks": {
+      "enabled": false,
+      "task_list_ids": [],
+      "page_size": 100,
+      "max_items": 100
+    },
+    "google_contacts": {
+      "enabled": false,
+      "page_size": 100,
+      "max_items": 100,
+      "person_fields": "names,emailAddresses,phoneNumbers,organizations,birthdays,addresses,metadata"
+    },
     "chrome_bookmarks": {
       "enabled": false,
       "bookmarks_file": "~/Library/Application Support/Google/Chrome/Default/Bookmarks",
@@ -67,18 +170,6 @@
       "unread_only": true,
       "max_age_hours": 24,
       "max_items": 20
-    },
-    "apple_mail_app": {
-      "enabled": false,
-      "backend": "mail_app_script",
-      "reader_argv": [
-        "osascript",
-        "-e",
-        "return \"[]\""
-      ],
-      "max_items": 20,
-      "max_body_chars": 4000,
-      "timeout_seconds": 20
     }
   },
   "reminders": {
@@ -87,6 +178,14 @@
       "money": "MONEY",
       "health": "HEALTH",
       "relationship": "NETWORK",
+      "work": "WORK"
+    }
+  },
+  "calendars": {
+    "domain_calendars": {
+      "money": "MONEY",
+      "health": "HEALTH",
+      "relationship": "FAMILY",
       "work": "WORK"
     }
   },

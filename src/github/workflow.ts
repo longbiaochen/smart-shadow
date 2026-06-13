@@ -1,0 +1,297 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { execa } from "execa";
+
+import type { Config } from "../config.js";
+import type { Registry } from "../shadow/registry.js";
+import type { ShadowMessage } from "../shadow/types.js";
+import { toGitHubIssueTask, type GitHubIssueTask } from "./adapter.js";
+import { GitHubReplier } from "./reply.js";
+
+export interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+export type CommandRunner = (command: string, args: string[], options: { cwd: string }) => Promise<CommandResult>;
+
+export const defaultCommandRunner: CommandRunner = async (command, args, options) => {
+  const result = await execa(command, args, { cwd: options.cwd, reject: false, stdin: "ignore" });
+  return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode ?? 0 };
+};
+
+export function slugForBranch(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/g, "");
+  return slug || "issue";
+}
+
+export function branchForTask(task: Pick<GitHubIssueTask, "issueNumber" | "issueTitle">): string {
+  return `shadow/issue-${task.issueNumber}-${slugForBranch(task.issueTitle)}`;
+}
+
+export function lockKeyForTask(task: Pick<GitHubIssueTask, "repoFullName" | "issueNumber">): string {
+  return `github:${task.repoFullName}#${task.issueNumber}:shadow`;
+}
+
+export function buildShadowIssuePrompt(input: {
+  task: GitHubIssueTask;
+  comments: string;
+}): string {
+  return [
+    "You are shadow, a local Codex agent executed by shadowd inside the existing smart-shadow system.",
+    "",
+    `Repository: ${input.task.repoFullName}`,
+    `Issue: #${input.task.issueNumber} ${input.task.issueTitle}`,
+    `Issue URL: ${input.task.issueUrl}`,
+    "",
+    "Issue body:",
+    input.task.issueBody || "(empty)",
+    "",
+    "Relevant comments:",
+    input.comments || "(none)",
+    "",
+    `Labels: ${input.task.labels.join(", ") || "(none)"}`,
+    "",
+    "Instructions:",
+    "1. Understand the issue.",
+    "2. Make the smallest safe code change.",
+    "3. Preserve the existing architecture.",
+    "4. Do not rewrite unrelated files.",
+    "5. Do not expose secrets.",
+    "6. Do not run destructive commands.",
+    "7. Run the configured test command if available.",
+    "8. If ambiguous, make a conservative best effort and document assumptions.",
+    "9. Do not merge.",
+    "10. Leave the repository in a clean state.",
+    "",
+    "Output requirements:",
+    "- Summary",
+    "- Files changed",
+    "- Tests run",
+    "- Risks or follow-up"
+  ].join("\n");
+}
+
+export function summarizeOutput(output: string, maxLength = 1200): string {
+  const normalized = output.replace(/\s+/g, " ").trim();
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}...`;
+}
+
+export function splitTrustedCommand(command: string): string[] {
+  const parts = command.match(/"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|[^\s]+/g) ?? [];
+  return parts.map((part) => {
+    if ((part.startsWith("\"") && part.endsWith("\"")) || (part.startsWith("'") && part.endsWith("'"))) {
+      return part.slice(1, -1);
+    }
+    return part;
+  });
+}
+
+export function statusCommentAccepted(task: GitHubIssueTask): string {
+  return [
+    `👤 \`${task.agentName}\` 已接单。`,
+    "",
+    `- Trigger: ${task.trigger}`,
+    `- Repo: \`${task.repoFullName}\``,
+    `- Issue: #${task.issueNumber}`,
+    "- Status: queued"
+  ].join("\n");
+}
+
+export function statusCommentRunning(task: GitHubIssueTask, branch: string): string {
+  return [
+    `👤 \`${task.agentName}\` 开始执行。`,
+    "",
+    `- Service: \`${task.daemonName}\``,
+    `- Branch: \`${branch}\``,
+    "- Runtime: local Codex",
+    "- Status: running"
+  ].join("\n");
+}
+
+export function statusCommentPr(task: GitHubIssueTask, prUrl: string, summary: string, tests: string): string {
+  return [
+    `✅ \`${task.agentName}\` 已创建 PR：`,
+    "",
+    prUrl,
+    "",
+    `摘要：${summary}`,
+    "",
+    `测试：${tests}`,
+    "",
+    "请在 PR 中 review；如需继续修改，可以评论：",
+    "",
+    "@shadow continue"
+  ].join("\n");
+}
+
+export function statusCommentFailed(task: GitHubIssueTask, branch: string, errorSummary: string): string {
+  return [
+    `❌ \`${task.agentName}\` 执行失败。`,
+    "",
+    `- Service: \`${task.daemonName}\``,
+    `- Trigger: ${task.trigger}`,
+    `- Branch: \`${branch}\``,
+    `- Error summary: ${errorSummary}`,
+    "",
+    "请查看本地 `shadowd` 日志。"
+  ].join("\n");
+}
+
+export function statusCommentNoChanges(task: GitHubIssueTask, summary: string): string {
+  return [
+    `ℹ️ \`${task.agentName}\` 已执行，但没有产生代码变更。`,
+    "",
+    `摘要：${summary}`,
+    "",
+    "可能原因：",
+    "- Issue 已经被修复",
+    "- 任务描述不够明确",
+    "- Codex 判断不需要修改"
+  ].join("\n");
+}
+
+export function prBody(input: { task: GitHubIssueTask; summary: string; tests: string }): string {
+  return [
+    "## Summary",
+    "",
+    "Generated by `shadow`, executed by local `shadowd` inside `smart-shadow`.",
+    "",
+    "## Linked issue",
+    "",
+    `Closes #${input.task.issueNumber}`,
+    "",
+    "## Changes",
+    "",
+    input.summary,
+    "",
+    "## Tests",
+    "",
+    input.tests,
+    "",
+    "## Notes",
+    "",
+    "This PR was generated locally and requires human review before merge."
+  ].join("\n");
+}
+
+async function runChecked(runner: CommandRunner, cwd: string, command: string, args: string[]): Promise<CommandResult> {
+  const result = await runner(command, args, { cwd });
+  if (result.exitCode !== 0) {
+    throw new Error(`${command} ${args.join(" ")} failed: ${summarizeOutput(`${result.stdout}\n${result.stderr}`, 600)}`);
+  }
+  return result;
+}
+
+async function fetchIssueComments(input: { task: GitHubIssueTask; runner: CommandRunner; cwd: string }): Promise<string> {
+  const result = await input.runner("gh", [
+    "api",
+    `/repos/${input.task.repoFullName}/issues/${input.task.issueNumber}/comments`,
+    "--jq",
+    ".[-8:] | map(.user.login + \": \" + .body) | .[]"
+  ], { cwd: input.cwd });
+  return result.exitCode === 0 ? result.stdout : "";
+}
+
+async function writeRunLog(task: GitHubIssueTask, lines: string[]): Promise<string> {
+  const dir = path.resolve("var/logs/github-issue-workflow");
+  await mkdir(dir, { recursive: true });
+  const file = path.join(dir, `${Date.now()}-${task.repoFullName.replace(/[^a-z0-9_.-]+/gi, "-")}-${task.issueNumber}.log`);
+  await writeFile(file, `${lines.join("\n\n")}\n`, "utf8");
+  return file;
+}
+
+export async function runGitHubIssueWorkflow(input: {
+  msg: ShadowMessage;
+  config: Config;
+  registry: Registry;
+  replier: Pick<GitHubReplier, "comment">;
+  runner?: CommandRunner;
+}): Promise<{ status: "pr_created" | "no_changes"; branch: string; prUrl?: string; logPath: string }> {
+  const runner = input.runner ?? defaultCommandRunner;
+  const task = toGitHubIssueTask(input.msg, input.config);
+  const repoConfig = input.config.github.repos[task.repoFullName];
+  if (!repoConfig) throw new Error(`No GitHub repo mapping configured for ${task.repoFullName}.`);
+  const cwd = path.resolve(repoConfig.localPath);
+  const branch = branchForTask(task);
+  const lockKey = lockKeyForTask(task);
+  const logLines: string[] = [];
+
+  if (!input.registry.acquireTaskLock(lockKey)) {
+    await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: `👤 \`${task.agentName}\` 已在处理中。` });
+    throw new Error(`Task already locked: ${lockKey}`);
+  }
+
+  try {
+    await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: statusCommentAccepted(task) });
+    await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: statusCommentRunning(task, branch) });
+
+    await runChecked(runner, cwd, "git", ["fetch", "origin"]);
+    await runChecked(runner, cwd, "git", ["checkout", repoConfig.defaultBase]);
+    await runChecked(runner, cwd, "git", ["pull", "--ff-only", "origin", repoConfig.defaultBase]);
+    await runChecked(runner, cwd, "git", ["checkout", "-B", branch]);
+
+    const comments = await fetchIssueComments({ task, runner, cwd });
+    const prompt = buildShadowIssuePrompt({ task, comments });
+    const codexArgs = ["exec", "--sandbox", repoConfig.codexSandbox ?? "workspace-write", prompt];
+    const codex = await runner("codex", codexArgs, { cwd });
+    logLines.push(`codex exit=${codex.exitCode}`, codex.stdout, codex.stderr);
+    if (codex.exitCode !== 0) throw new Error(`codex exec failed: ${summarizeOutput(`${codex.stdout}\n${codex.stderr}`, 600)}`);
+
+    let tests = "not configured";
+    if (repoConfig.testCommand) {
+      const argv = splitTrustedCommand(repoConfig.testCommand);
+      const [testCommand, ...testArgs] = argv;
+      if (!testCommand) throw new Error("Configured test_command is empty.");
+      const testResult = await runner(testCommand, testArgs, { cwd });
+      tests = testResult.exitCode === 0 ? `passed: ${repoConfig.testCommand}` : `failed: ${repoConfig.testCommand}\n${summarizeOutput(`${testResult.stdout}\n${testResult.stderr}`, 600)}`;
+      logLines.push(`tests exit=${testResult.exitCode}`, testResult.stdout, testResult.stderr);
+      if (testResult.exitCode !== 0) throw new Error(tests);
+    }
+
+    const status = await runner("git", ["status", "--porcelain"], { cwd });
+    logLines.push("git status", status.stdout);
+    const summary = summarizeOutput(codex.stdout || "shadow completed the requested issue workflow.");
+    if (!status.stdout.trim()) {
+      const logPath = await writeRunLog(task, logLines);
+      await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: statusCommentNoChanges(task, summary) });
+      input.registry.releaseTaskLock(lockKey, "no_changes");
+      return { status: "no_changes", branch, logPath };
+    }
+
+    await runChecked(runner, cwd, "git", ["add", "-A"]);
+    await runChecked(runner, cwd, "git", ["commit", "-m", `Fix issue #${task.issueNumber} via shadow`]);
+    await runChecked(runner, cwd, "git", ["push", "-u", "origin", branch]);
+    const pr = await runChecked(runner, cwd, "gh", [
+      "pr",
+      "create",
+      "--repo",
+      task.repoFullName,
+      "--base",
+      repoConfig.defaultBase,
+      "--head",
+      branch,
+      "--title",
+      `[shadow] ${task.issueTitle}`,
+      "--body",
+      prBody({ task, summary, tests })
+    ]);
+    const prUrl = pr.stdout.trim().split(/\s+/).find((part) => part.startsWith("http")) ?? pr.stdout.trim();
+    logLines.push("pr", pr.stdout);
+    const logPath = await writeRunLog(task, logLines);
+    await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: statusCommentPr(task, prUrl, summary, tests) });
+    input.registry.releaseTaskLock(lockKey, "pr_created");
+    return { status: "pr_created", branch, prUrl, logPath };
+  } catch (error) {
+    const logPath = await writeRunLog(task, [...logLines, String(error)]);
+    await input.replier.comment({ repository: task.repoFullName, itemType: "issue", number: task.issueNumber, body: statusCommentFailed(task, branch, summarizeOutput(String(error), 500)) });
+    input.registry.releaseTaskLock(lockKey, "failed");
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), { logPath });
+  }
+}

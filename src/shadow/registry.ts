@@ -10,7 +10,9 @@ const defaultData = (): RegistryData => ({
     { key: "smart-shadow", name: "智能影子", cwd: ".", aliases: ["智能影子", "Smart Shadow", "smartshadow"] }
   ],
   bindings: {},
-  processedMessages: {}
+  processedMessages: {},
+  processedGitHubDeliveries: {},
+  taskLocks: {}
 });
 
 export class Registry {
@@ -73,5 +75,25 @@ export class Registry {
 
   markProcessed(messageId: string, status: string): void {
     this.data.processedMessages[messageId] = { processedAt: new Date().toISOString(), status };
+  }
+
+  hasProcessedGitHubDelivery(deliveryId: string): boolean {
+    return Boolean(this.data.processedGitHubDeliveries[deliveryId]);
+  }
+
+  markProcessedGitHubDelivery(deliveryId: string, status: string): void {
+    this.data.processedGitHubDeliveries[deliveryId] = { processedAt: new Date().toISOString(), status };
+  }
+
+  acquireTaskLock(lockKey: string, ttlMs = 60 * 60 * 1000): boolean {
+    const existing = this.data.taskLocks[lockKey];
+    if (existing && Date.now() - Date.parse(existing.processedAt) < ttlMs) return false;
+    this.data.taskLocks[lockKey] = { processedAt: new Date().toISOString(), status: "running" };
+    return true;
+  }
+
+  releaseTaskLock(lockKey: string, status = "released"): void {
+    delete this.data.taskLocks[lockKey];
+    this.data.processedMessages[`lock:${lockKey}`] = { processedAt: new Date().toISOString(), status };
   }
 }

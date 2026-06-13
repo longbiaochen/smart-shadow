@@ -19,28 +19,32 @@ Project items even when they do not have `smartshadow` or `SmartShadow` labels.
 
 Labels may still help classify an issue:
 
-- `voice`: voice issue.
-- `ready` or `ss/state:ready-for-execution`: voice transcription already
-  produced the final task description.
+- `smartshadow` or equivalent source labels: issue was created from Smart
+  Shadow after local user confirmation.
+- `ready` or `ss/state:ready-for-execution`: issue text is ready for execution.
 - `blocked`, `waiting-user`, or similar labels: external review is needed.
 
 Labels are hints, not the intake filter.
 
 ## Issue Classes
 
-### Voice Issue
+### Smart Shadow Text Issue
 
-A voice issue is identified by compact Smart Shadow metadata in the issue body,
-an `audio_path` field, or a `voice` label.
+A Smart Shadow issue is created by the iOS/macOS front end after local audio
+capture, local ChatType transcription, local polish, and user confirmation. It
+contains the final text task plus compact source metadata. It does not contain
+raw audio, an audio upload path, a temporary recording repository reference, or a
+raw transcript dump.
 
 Rendered issue body order:
 
 1. Final task description first.
-2. No raw transcript section.
+2. No raw audio reference or raw transcript section.
 3. Compact metadata in a folded or otherwise low-noise block.
 
-If a voice issue is already ready, `shadowd` no-ops. If it still has legacy raw
-transcript formatting, `shadowd` plans a body cleanup or clarification comment.
+`shadowd` treats this issue as user intent ready for execution. If it still has
+legacy `audio_path` or raw transcript formatting, `shadowd` plans a clarification
+comment asking for the final text task instead of running ASR.
 
 ### Ordinary Project Issue
 

@@ -63,4 +63,10 @@ if "$ROOT/bin/smart-shadow" eventkit-status | rg -q '"reminders"[[:space:]]*:[[:
     cat "$TMP_DIR/out.json"
     exit 1
   fi
+else
+  if rg -q '"code"[[:space:]]*:[[:space:]]*"source_blocked"' "$TMP_DIR/out.json"; then
+    echo "did not expect disabled source readiness to require service attention"
+    cat "$TMP_DIR/out.json"
+    exit 1
+  fi
 fi

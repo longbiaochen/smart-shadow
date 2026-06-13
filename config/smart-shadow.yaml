@@ -11,6 +11,39 @@ feishu:
   requireMentionInGroup: false
   dryRunReply: false
 
+github:
+  enabled: false
+  agentName: shadow
+  daemonName: shadowd
+  assignee: shadow
+  commentCommand: "@shadow"
+  allowedCommentCommands:
+    - "@shadow"
+    - "@shadow fix"
+    - "@shadow continue"
+    - "@shadow test"
+    - "@shadow explain"
+  webhook:
+    publicUrl: https://smart-shadow.bozhi.ai/channels/github/webhook
+    host: 127.0.0.1
+    port: 8787
+    path: /channels/github/webhook
+    secretEnv: SMART_SHADOW_GITHUB_WEBHOOK_SECRET
+  repositories:
+    - longbiaochen/smart-shadow
+  repos:
+    longbiaochen/smart-shadow:
+      localPath: /Users/longbiao/Projects/smart-shadow
+      defaultBase: main
+      allowedSenders:
+        - longbiaochen
+      testCommand: pnpm test:shadowd
+      codexSandbox: workspace-write
+  events:
+    - issues
+    - issue_comment
+  dryRunReply: true
+
 codex:
   appServer:
     command: codex
@@ -18,9 +51,9 @@ codex:
       - app-server
       - --stdio
   model: gpt-5.5
-  defaultCwd: .
+  defaultCwd: /Users/longbiao/Projects/smart-shadow
   mainProjectKey: smart-shadow
-  dispatcherThreadTitle: smart-shadow-main
+  dispatcherThreadTitle: shadowd-router
   approvalPolicy: unlessTrusted
   sandbox: workspaceWrite
 

@@ -1,13 +1,13 @@
 ---
 name: smart-shadow
-description: Use this skill when Codex should act as the engineering execution assistant for Smart Shadow tasks that come from Feishu, Feishu CLI, Smart Shadow listener, pasted Feishu messages, or user requests explicitly mentioning "智能影子", "Smart Shadow", "飞书任务", "Feishu 任务", "Feishu CLI", or "从飞书来的消息". Use it when asked to turn Feishu messages into executable Codex engineering tasks, route work to a project, MacBook, local directory, Linux server, or Codex session, or produce a concise result summary suitable for writing back to Feishu. Do not use for ordinary code tasks, casual chat, or pure document polishing unless the request is clearly connected to Smart Shadow or Feishu task routing.
+description: Use this skill when Codex should act as the engineering execution assistant for Smart Shadow tasks that come from Feishu, Feishu CLI, Smart Shadow listener, pasted Feishu messages, or user requests explicitly mentioning "智能影子", "Smart Shadow", "SmartShader", "Smart Shader", "飞书任务", "Feishu 任务", "Feishu CLI", or "从飞书来的消息". Use it when asked to turn Feishu messages into executable Codex engineering tasks, route work to a project, MacBook, local directory, Linux server, or Codex session, refine Smart Shadow workflow rules, publish Smart Shadow or SmartShader skill updates, or produce a concise result summary suitable for writing back to Feishu. Do not use for ordinary code tasks, casual chat, or pure document polishing unless the request is clearly connected to Smart Shadow or Feishu task routing.
 ---
 
 # Smart Shadow
 
 ## Purpose
 
-Use this skill to convert Feishu-originated work into safe, executable Codex tasks and produce a concise completion summary that can be written back to Feishu. Keep the workflow instruction-only by default; add helper scripts only when a repeated, deterministic transformation becomes worth automating.
+Use this skill to convert Feishu-originated work into safe, executable Codex tasks and produce a concise completion summary that can be written back to Feishu. Smart Shadow is also the durable workspace for defining, refining, and publishing Smart Shadow / SmartShader workflow rules. Keep the workflow instruction-only by default; add helper scripts only when a repeated, deterministic transformation becomes worth automating.
 
 ## Intake
 
@@ -41,11 +41,28 @@ A task can have multiple labels. If any label implies `approval_required`, handl
 
 ## Routing
 
-Prefer the current Codex project and current working directory. If the task clearly belongs elsewhere, state the recommended route first: project, local directory, MacBook, Linux server, or Codex session.
+For Feishu-originated messages, the main dispatcher session belongs in the Smart Shadow project by default. The dispatcher decides where work should run but does not execute the work itself.
+
+Prefer the current Codex project and current working directory for execution. If the task clearly belongs elsewhere, state the recommended route first: project, local directory, MacBook, Linux server, or Codex session.
 
 Do not blindly cross directories or connect to remote machines when routing evidence is weak. Ask for the missing target or proceed only with read-only discovery in the current workspace.
 
 When working inside the Smart Shadow repository, honor its product boundary: Swift-native Mac core, auditable sources, safe local runtime paths, and explicit approval gates for visible or external actions.
+
+Use Smart Shadow as the default project for workflow-rule conversations, Smart Shadow or SmartShader skill updates, Feishu bridge changes, and rule-publication work.
+
+## Workflow Rule Publishing
+
+When a conversation establishes a durable workflow rule, capture it in the appropriate Smart Shadow surface:
+
+- `AGENTS.md` for repository-wide implementation constraints.
+- `docs/WORKFLOW.md` for Feishu routing, skill publishing, nightly maintenance, and testing policy.
+- `skills/smart-shadow/SKILL.md` for publishable Smart Shadow / SmartShader skill behavior.
+- Source code, config, and tests when the rule changes executable behavior.
+
+Nightly or periodic maintenance may draft skill updates, changelogs, and X post text from accepted rules. It must not push to GitHub, send Feishu messages, or post to X without explicit approval for the exact change set and post content. X posting also requires the supported posting workflow to verify the created `/status/` URL.
+
+Local development should run narrow relevant tests. Full closed-loop testing is not required for every local change; use a remote Codex environment such as Janus for deliberate closed-loop acceptance when available.
 
 ## Execution
 

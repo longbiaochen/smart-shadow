@@ -1,6 +1,6 @@
 export interface ShadowMessage {
   id: string;
-  source: "feishu";
+  source: "feishu" | "github";
   eventKey: string;
   receivedAt: string;
   sender: {
@@ -21,6 +21,25 @@ export interface ShadowMessage {
     type: "text" | "post" | "image" | "file" | "unknown";
     text: string;
     raw: unknown;
+  };
+  github?: {
+    repository: string;
+    owner: string;
+    repo: string;
+    eventName: string;
+    action: string;
+    deliveryId: string;
+    conversationKey: string;
+    itemType: "issue" | "pull" | "workflow";
+    number?: number;
+    url?: string;
+    issueTitle?: string;
+    issueBody?: string;
+    commentBody?: string;
+    command?: string;
+    trigger?: "assigned" | "comment";
+    labels: string[];
+    assignees: string[];
   };
   raw: unknown;
 }
@@ -82,4 +101,6 @@ export interface RegistryData {
   projects: KnownProject[];
   bindings: Record<string, ThreadBinding>;
   processedMessages: Record<string, ProcessedMessage>;
+  processedGitHubDeliveries: Record<string, ProcessedMessage>;
+  taskLocks: Record<string, ProcessedMessage>;
 }

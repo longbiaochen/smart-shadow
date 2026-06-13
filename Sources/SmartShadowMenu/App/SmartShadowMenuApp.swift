@@ -10,13 +10,12 @@ struct SmartShadowMenuApp: App {
     var body: some Scene {
         MenuBarExtra {
             StatusPanelView(store: store)
-                .frame(width: 420)
+                .frame(width: 460)
                 .task {
                     await store.refresh()
                 }
         } label: {
-            Label("Smart Shadow", systemImage: store.snapshot.summary.systemImage)
-                .symbolRenderingMode(.hierarchical)
+            MenuBarStatusIcon(summary: store.snapshot.summary)
         }
         .menuBarExtraStyle(.window)
     }
@@ -28,3 +27,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+private struct MenuBarStatusIcon: View {
+    let summary: ServiceSummary
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Image(systemName: "moon.stars.circle.fill")
+                .symbolRenderingMode(.hierarchical)
+            Circle()
+                .fill(statusColor)
+                .frame(width: 5, height: 5)
+                .offset(x: 1, y: 1)
+        }
+        .accessibilityLabel("智能影子 \(summary.title)")
+    }
+
+    private var statusColor: Color {
+        switch summary {
+        case .running: .green
+        case .attention: .orange
+        case .stopped: .secondary
+        case .unknown: .red
+        }
+    }
+}

@@ -1,25 +1,57 @@
 # Architecture
 
-Smart Shadow is a Swift-native macOS core for a local, auditable assistant. The current implementation is a SwiftPM executable with CLI commands, launchd lifecycle support, EventKit integration, SQLite state, audit logs, and report generation.
+Smart Shadow is an iPhone-first personal task entry system with a local,
+auditable execution backend. The MVP loop is:
 
-The `life-os` workflow adds one narrow Swift-native loop inside the local core:
-`shadowd` reconciles the whole Life OS GitHub Project and derives next actions
-from GitHub Issue / Project / PR state. It does not maintain a separate task
-database. Voice issues are one issue class inside that Project, not the queue
-boundary.
+1. The iPhone app captures a voice task through a single primary button.
+2. The app keeps only a short-lived local audio cache, uses local ChatType
+   runtime/polish capabilities for transcription and cleanup, and turns the
+   final text into a structured task card.
+3. The user confirms the task before it is submitted to `shadow`.
+4. GitHub Issue / Comment / PR becomes the durable task record.
+5. Local `shadowd` assigns the task to a Codex agent, records progress, and
+   synchronizes status back to the app.
+
+The current implementation is Swift-native across the iOS app and local Mac
+service surfaces. The Mac side includes CLI commands, launchd lifecycle support,
+GitHub issue handling, EventKit integration, SQLite state, audit logs, and report
+generation.
+
+The `life-os` workflow is the current GitHub-backed MVP coordination surface:
+`shadowd` reconciles the Life OS GitHub Project and derives next actions from
+GitHub Issue / Project / PR state. It does not maintain a separate authoritative
+task database.
 
 ## Component Model
 
-- Sensing sources collect bounded local signals: JSON event files, file metadata, structured Lark calendar/task reads, Google Calendar/Tasks/Contacts reads, local command summaries, browser bookmark metadata, EventKit Reminders reads, and local mail-summary JSON.
-- The ingest layer normalizes signals, writes them to SQLite, and deduplicates by source and source ID.
-- The rule registry in `config/rules.json` decides domain, priority, risk, review requirement, and default action.
-- The projection engine maps one canonical work item into Apple Reminders, Apple Calendar, or an explicitly requested low-risk Mail action. Lark task data is read-only input and is never a mail projection target.
-- Local executors only run approved, low-risk actions. Draft-writing is the current safe executor shape.
-- Reports summarize review items, background context, source coverage, and recent rule feedback.
-- `shadowd` owns the GitHub Project reconcile loop for the Life OS Project dashboard. It may use labels as hints, but Project membership is the queue boundary.
-- `chat-type-cli` is used only when a Project issue is explicitly a voice issue that still needs transcription.
+- `SmartShadowIOS` is the primary product surface. It owns voice capture, transcript display, task-card confirmation, task status display, follow-up capture, and push-notification landing.
+- `shadow` is the unified agent identity shown to the user. The user should not need to pick among local Codex agents.
+- GitHub Issue is the task master record for development work and other tracked work. Issue comments carry meaningful progress updates, blockers, user follow-up, PR links, and completion summaries.
+- The user GitHub identity writes only the user's explicit intent: new task issues, follow-up comments, and replies to Shadow questions after local confirmation.
+- The Shadow GitHub App bot identity writes execution state: acknowledgements, plans, progress, labels/status updates, branches, commits, and PRs.
+- Pull Requests are created only when code changes are ready for review. They are not used for routine progress logging.
+- `shadowd` owns webhook intake, GitHub reconcile, repo/project mapping, Codex agent assignment, idempotency, progress comments, branch/commit/PR creation, and status synchronization.
+- `shadowd` does not record audio, store audio, transcribe speech, polish user text, or write GitHub content as the user.
+- ChatType Runtime/Polish is the local ASR and text-cleanup capability used by the iOS/macOS front end before GitHub submission.
+- Existing sensing sources collect bounded local signals: JSON event files, file metadata, structured Lark calendar/task reads, Google Calendar/Tasks/Contacts reads, local command summaries, browser bookmark metadata, EventKit Reminders reads, and local mail-summary JSON.
+- The rule registry in `config/rules.json` decides domain, priority, risk, review requirement, and default action for local assistant flows.
+- The projection engine maps one canonical work item into Apple Reminders, Apple Calendar, or an explicitly requested low-risk Mail action. These surfaces support the broader local assistant, but they are not the MVP task master record.
+- Reports summarize review items, background context, source coverage, GitHub task state, and recent rule feedback.
 
-## Data Flow
+## MVP Data Flow
+
+1. The user opens the iPhone app and records a task.
+2. The app stores only a short-lived local audio cache, transcribes and polishes the text locally, recognizes intent, and builds a structured task card with title, type, project, background, target output, acceptance criteria, priority, PR need, and confirmation requirement.
+3. The user confirms, edits, cancels, re-records, or adds a follow-up.
+4. Confirmed tracked work creates or updates a GitHub Issue or Issue Comment with the user's GitHub identity. GitHub stores only the final text task and compact Smart Shadow metadata, never raw audio.
+5. `shadowd` reads the GitHub task state, maps it to a local repo or management project, assigns a local Codex agent, and records local operational evidence.
+6. `shadowd` and the assigned agent write meaningful progress as the Shadow bot identity. If code changes are ready for review, `shadowd` creates a linked PR.
+7. The app refreshes task state from the GitHub-backed record and uses push notifications only for key state changes: need input, PR ready, done, failed, long blocked, or watched-task update.
+8. The user confirms completion, requests changes, or adds a new follow-up.
+
+## Local Assistant Data Flow
+
+The repository still supports local assistant sensing and EventKit projection:
 
 1. A source places or returns structured signals.
 2. `run-once` or the daemon ingests the signal and records it in SQLite.
@@ -28,17 +60,17 @@ boundary.
 5. Actions, decisions, and projection IDs are recorded for later explanation and dedupe.
 6. Reports and audit logs provide operator-facing and technical evidence.
 
-## Life OS Project Reconcile Flow
+## GitHub Task Reconcile Flow
 
 The backend loop uses GitHub as the durable coordination surface:
 
 1. `bin/shadowd once` reads open issues from the Life OS GitHub Project.
 2. Each issue is classified from issue body metadata, labels, Project fields,
    comments, and linked PRs.
-3. Voice issues are handled by the voice path only when they include Smart
-   Shadow metadata or an equivalent voice marker.
-4. Ordinary Project issues are never sent through ASR. They are reconciled from
-   Project status, custom status, issue template completeness, and PR state.
+3. Smart Shadow-created issues are treated as already-transcribed user intent.
+   `shadowd` must not retrieve audio or run ASR from GitHub state.
+4. Ordinary Project issues are reconciled from Project status, custom status,
+   issue template completeness, comments, labels, and PR state.
 5. If custom status is `完成` but Project `Status` is not done, `shadowd` plans
    Project Status alignment.
 6. If required template sections are missing, `shadowd` plans a clarification
@@ -47,7 +79,23 @@ The backend loop uses GitHub as the durable coordination surface:
 
 `shadowd` stores only local operational evidence, such as logs, audit JSONL,
 dry-run reports, and bounded caches. GitHub remains the cross-device source of
-truth.
+truth for the MVP task lifecycle.
+
+## MVP Status Model
+
+The app-facing task state is intentionally small:
+
+| State | Meaning |
+|---|---|
+| Draft | Recognized but not submitted |
+| Submitted | Confirmed and sent to `shadow` |
+| Queued | `shadowd` received the task and is waiting to execute |
+| Running | A Codex agent is executing |
+| Need Input | User input is required |
+| PR Ready | A linked PR is ready for review |
+| Done | Work is complete |
+| Failed | Execution failed |
+| Cancelled | User cancelled the task |
 
 ## EventKit Projection Model
 

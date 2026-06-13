@@ -13,8 +13,11 @@ config/*.bak-*
 *.sqlite-shm
 *.sqlite-wal
 *.log
+shadowd/logs/*.json
+shadowd/sessions.json
 __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
 .DS_Store
+*.xcuserstate

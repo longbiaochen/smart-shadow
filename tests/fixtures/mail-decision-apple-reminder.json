@@ -1,0 +1,16 @@
+{
+  "canonical_key": "apple_mail:fixture-health-001",
+  "source_id": "fixture-health-001",
+  "subject": "体检复查提醒",
+  "sender": "clinic@example.com",
+  "received_at": "2026-06-04T08:05:00Z",
+  "mailbox": "INBOX",
+  "summary": "Codex automation judged this as a personal health action.",
+  "projection_target": "apple_reminder",
+  "action": "create_review_reminder",
+  "domain": "health",
+  "priority": "high",
+  "risk": "medium",
+  "reason": "codex_automation: personal health mail remains on Apple Reminders.",
+  "suggested_action": "安排体检复查。"
+}

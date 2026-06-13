@@ -8,15 +8,34 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "smart-shadow-mac-core", targets: ["SmartShadowMacCore"]),
-        .executable(name: "smart-shadow-menu", targets: ["SmartShadowMenu"])
+        .library(name: "SmartShadowGitHubAPI", targets: ["SmartShadowGitHubAPI"]),
+        .library(name: "SmartShadowShared", targets: ["SmartShadowShared"]),
+        .executable(name: "shadowd", targets: ["ShadowD"]),
+        .executable(name: "smart-shadow-menu", targets: ["SmartShadowMenu"]),
+        .executable(name: "smart-shadow-companion-mac", targets: ["SmartShadowCompanionMac"])
     ],
     targets: [
         .executableTarget(
-            name: "SmartShadowMacCore",
+            name: "ShadowD",
+            dependencies: ["SmartShadowShared"],
             path: "Sources/SmartShadowMacCore",
             linkerSettings: [
-                .linkedFramework("EventKit")
+                .linkedFramework("Contacts"),
+                .linkedFramework("EventKit"),
+                .linkedFramework("Security")
+            ]
+        ),
+        .target(
+            name: "SmartShadowGitHubAPI",
+            path: "Sources/SmartShadowGitHubAPI"
+        ),
+        .target(
+            name: "SmartShadowShared",
+            path: "Sources/SmartShadowShared",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("Security"),
+                .linkedFramework("SwiftUI")
             ]
         ),
         .target(
@@ -32,10 +51,33 @@ let package = Package(
                 .linkedFramework("SwiftUI")
             ]
         ),
+        .executableTarget(
+            name: "SmartShadowCompanionMac",
+            dependencies: ["SmartShadowGitHubAPI", "SmartShadowShared"],
+            path: "Sources/SmartShadowCompanionMac",
+            exclude: ["Assets.xcassets"],
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("Carbon"),
+                .linkedFramework("ServiceManagement"),
+                .linkedFramework("Speech"),
+                .linkedFramework("SwiftUI")
+            ]
+        ),
         .testTarget(
             name: "SmartShadowMenuCoreTests",
             dependencies: ["SmartShadowMenuCore"],
             path: "tests/SmartShadowMenuCoreTests"
+        ),
+        .testTarget(
+            name: "SmartShadowSharedTests",
+            dependencies: ["SmartShadowGitHubAPI", "SmartShadowShared"],
+            path: "tests/SmartShadowSharedTests"
+        ),
+        .testTarget(
+            name: "SmartShadowCompanionMacTests",
+            dependencies: ["SmartShadowCompanionMac"],
+            path: "tests/SmartShadowCompanionMacTests"
         )
     ]
 )

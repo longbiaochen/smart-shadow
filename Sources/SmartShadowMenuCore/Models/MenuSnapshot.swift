@@ -13,6 +13,15 @@ public struct MenuSnapshot: Sendable {
         return serviceStatus?.summary ?? .unknown
     }
 
+    public static func initial() -> MenuSnapshot {
+        MenuSnapshot(
+            serviceStatus: nil,
+            healthStatus: nil,
+            refreshedAt: Date(),
+            errorMessage: nil
+        )
+    }
+
     public static func success(serviceStatus: ServiceStatus, healthStatus: HealthStatus?) -> MenuSnapshot {
         MenuSnapshot(
             serviceStatus: serviceStatus,
@@ -30,5 +39,13 @@ public struct MenuSnapshot: Sendable {
             errorMessage: String(describing: error)
         )
     }
-}
 
+    public func withError(_ error: Error) -> MenuSnapshot {
+        MenuSnapshot(
+            serviceStatus: serviceStatus,
+            healthStatus: healthStatus,
+            refreshedAt: Date(),
+            errorMessage: String(describing: error)
+        )
+    }
+}

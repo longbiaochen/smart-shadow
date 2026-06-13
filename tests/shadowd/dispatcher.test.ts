@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { dispatchMessage, parseDispatchDecision } from "../../src/codex/dispatcher.js";
 import { buildDispatcherPrompt, buildWorkingThreadPrompt } from "../../src/codex/prompts.js";
-import { handleDecision } from "../../src/index.js";
+import { appendTaskBoardLink, buildDispatchProgressMessage, createTaskBoardItem, handleDecision } from "../../src/index.js";
 import { Registry } from "../../src/shadow/registry.js";
 import type { KnownProject, ShadowMessage, ThreadBinding } from "../../src/shadow/types.js";
 
@@ -33,11 +33,11 @@ const binding: ThreadBinding = {
 test("dispatcher prompt stays compact while preserving routing contract and binding context", () => {
   const prompt = buildDispatcherPrompt({ msg, existingBinding: binding });
 
-  assert.match(prompt, /Return JSON only/);
-  assert.match(prompt, /ordinary Codex Chats/);
-  assert.match(prompt, /not treat smart-shadow as the default project/);
-  assert.match(prompt, /Do not invent thread ids/);
-  assert.match(prompt, /Codex's own visible project and session inventory/);
+  assert.match(prompt, /只返回 JSON/);
+  assert.match(prompt, /Smart Shadow 项目/);
+  assert.match(prompt, /来自飞书的 main session 默认创建在 Smart Shadow 项目里/);
+  assert.match(prompt, /不要编造 thread id/);
+  assert.match(prompt, /Codex 自己可见的项目和会话清单/);
   assert.doesNotMatch(prompt, /Known projects:/);
   assert.doesNotMatch(prompt, /Candidate threads:/);
   assert.doesNotMatch(prompt, /aliases/);
@@ -62,10 +62,10 @@ test("working prompt is Feishu-ready and blocks unsafe actions without approval"
     }
   });
 
-  assert.match(prompt, /Source:/);
-  assert.match(prompt, /Do not send Feishu messages/);
-  assert.match(prompt, /Final response must be Feishu-ready/);
-  assert.match(prompt, /Status: done \/ blocked \/ needs_approval \/ failed/);
+  assert.match(prompt, /来源：/);
+  assert.match(prompt, /未经明确授权，不要发送飞书消息/);
+  assert.match(prompt, /最终回复必须适合直接发回飞书/);
+  assert.match(prompt, /状态：done \/ blocked \/ needs_approval \/ failed/);
 });
 
 test("parseDispatchDecision extracts fenced JSON and validates action shape", () => {
@@ -244,4 +244,79 @@ test("handleDecision rejects an unresumable thread id instead of executing blind
 
   assert.equal(turnStarted, false);
   assert.match(text, /应该恢复哪个 Codex thread/);
+});
+
+test("createTaskBoardItem creates a Feishu task only for working-thread decisions", async () => {
+  const created = await createTaskBoardItem({
+    msg,
+    decision: {
+      action: "start_thread",
+      confidence: 0.9,
+      reason: "smart-shadow implied",
+      threadTitle: "更新 Smart Shadow README",
+      projectKey: "smart-shadow",
+      cwd: "/repo/smart-shadow",
+      riskLevel: "low",
+      requiresApproval: false
+    },
+    taskClient: {
+      createTask: async (input) => ({
+        summary: input.summary,
+        url: "https://applink.feishu.cn/client/todo/task?guid=task_001"
+      })
+    }
+  });
+
+  assert.deepEqual(created, {
+    created: true,
+    title: "更新 Smart Shadow README",
+    url: "https://applink.feishu.cn/client/todo/task?guid=task_001"
+  });
+
+  const skipped = await createTaskBoardItem({
+    msg,
+    decision: {
+      action: "reply_only",
+      confidence: 0.9,
+      reason: "simple",
+      replyText: "收到",
+      riskLevel: "low",
+      requiresApproval: false
+    },
+    taskClient: {
+      createTask: async () => {
+        throw new Error("should not create");
+      }
+    }
+  });
+
+  assert.equal(skipped, undefined);
+});
+
+test("dispatch progress and final replies expose the plain Feishu task URL", () => {
+  const taskBoard = {
+    created: true,
+    title: "更新 Smart Shadow README",
+    url: "https://applink.feishu.cn/client/todo/task?guid=task_001"
+  };
+  const decision = {
+    action: "start_thread" as const,
+    confidence: 0.9,
+    reason: "smart-shadow implied",
+    threadTitle: "更新 Smart Shadow README",
+    projectKey: "smart-shadow",
+    cwd: "/repo/smart-shadow",
+    riskLevel: "low" as const,
+    requiresApproval: false
+  };
+
+  const progress = buildDispatchProgressMessage(decision, taskBoard);
+  assert.match(progress, /已完成分派/);
+  assert.match(progress, /启动新的 Codex thread/);
+  assert.match(progress, /任务看板：https:\/\/applink\.feishu\.cn\/client\/todo\/task\?guid=task_001/);
+
+  assert.equal(
+    appendTaskBoardLink("状态：done\n摘要：完成。", taskBoard),
+    "状态：done\n摘要：完成。\n\n任务看板：https://applink.feishu.cn/client/todo/task?guid=task_001"
+  );
 });

@@ -23,7 +23,7 @@ test("fixture demo returns a Feishu dry-run reply transcript", async () => {
   assert.match(transcript, /Smart Shadow 收到/);
 });
 
-test("discoverLocalProjects exposes project slugs and compact aliases for Chats routing", async () => {
+test("discoverLocalProjects exposes project slugs and compact aliases for project routing", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "shadowd-projects-"));
   try {
     await mkdir(path.join(dir, "chat-type"));

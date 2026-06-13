@@ -1,6 +1,27 @@
 # Smart Shadow Workflow
 
-This document captures durable workflow rules for Feishu-originated Codex work, Smart Shadow rule refinement, skill publishing, and closed-loop verification.
+This document captures durable workflow rules for the Smart Shadow MVP task
+loop, Feishu-originated Codex work, Smart Shadow rule refinement, skill
+publishing, and closed-loop verification.
+
+## MVP Task Loop
+
+The PRD-level workflow is iPhone-first:
+
+1. The user speaks a task through the iPhone Shadow Button.
+2. The app transcribes, recognizes intent, and creates a structured task card.
+3. The user confirms, edits, cancels, re-records, or adds context.
+4. Confirmed tracked work is submitted to the unified agent identity `shadow`.
+5. GitHub Issue / Comment / PR becomes the durable lifecycle record.
+6. Local `shadowd` maps the task to the right project/repo, assigns a Codex
+   agent, writes progress comments, and creates PRs only for reviewable code
+   changes.
+7. The app shows Draft, Submitted, Queued, Running, Need Input, PR Ready, Done,
+   Failed, or Cancelled state and lands push notifications on the relevant task.
+8. The user confirms completion, requests changes, or creates follow-up work.
+
+Feishu remains an auxiliary or legacy coordination channel. It must not redefine
+the MVP product surface as a Feishu workbench.
 
 ## Feishu To Codex Routing
 
@@ -90,10 +111,15 @@ Reconcile rules:
 
 - Inspect the whole Life OS Project; do not require `smartshadow` or
   `SmartShadow` labels.
-- Detect voice issues from compact metadata, `audio_path`, or a `voice` label.
-- For voice issues, render final task description first, skip raw transcript,
-  and keep metadata compact/folded.
-- For ordinary issues, never run ASR/transcription.
+- Treat Smart Shadow-created issues/comments as already-confirmed text intent.
+  The iOS/macOS front end owns local audio capture, ChatType transcription,
+  polish, and user confirmation before GitHub submission.
+- Never upload, fetch, store, or transcribe raw audio in `shadowd`. If a legacy
+  issue still contains `audio_path`, raw transcript formatting, or a `voice`
+  packet marker, classify it as legacy intake and ask for a final text task
+  rather than starting ASR.
+- Ordinary issues and Smart Shadow issues are reconciled from GitHub text state,
+  labels, Project fields, comments, and linked PRs.
 - If custom status is `完成` but Project `Status` is not done, plan Project
   Status alignment.
 - If required task-template sections are missing, append a clarification

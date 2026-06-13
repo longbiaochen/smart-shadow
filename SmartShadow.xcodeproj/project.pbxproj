@@ -1,0 +1,1604 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00CB3BDA84D530A9208D50D2 /* VoiceRecorderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E7A150CEBAE742BEAB0F3E1 /* VoiceRecorderService.swift */; };
+		0732608A429ADA4052F1F06E /* SmartShadowShared.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC342CCE807D804B47E17B32 /* SmartShadowShared.framework */; };
+		079B153DF7D75E87E936B425 /* HotkeyOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC45042F5875630C91E5024 /* HotkeyOverlayController.swift */; };
+		0A463D0D93E543A7ECAC34AF /* ChatTypeCLIProcessingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A3E723DD1105E4C2158A79 /* ChatTypeCLIProcessingClient.swift */; };
+		0B6510CA1A6B5CC69117AFE6 /* GitHubAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C272A09A217E4B90911815C /* GitHubAPIClient.swift */; };
+		0F42FF062986BD3ADC02D261 /* ShadowOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5D58041F4A6967B32A4C3 /* ShadowOrbView.swift */; };
+		19427DB5D19051050D132CC8 /* ShadowGitHubActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4851F483FFC5BC6896FFED /* ShadowGitHubActionExecutor.swift */; };
+		1D3CC09CBBD50ED5D11A7CAE /* SmartShadowGitHubAPI_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */; };
+		2580A099D3CE500660F15231 /* GitHubInboxUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D3B73E110EDE00991AA69A8 /* GitHubInboxUploader.swift */; };
+		3713F804F362FF505BFDF44A /* IssueStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D55FFE4D1D72358B877C4FC /* IssueStateMachine.swift */; };
+		3BB5D519F7397587B02B388A /* ShadowConsoleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799E0B5B1C608B6544141ECA /* ShadowConsoleUITests.swift */; };
+		3C9367F5CAA5EE407096A564 /* SmartShadowIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD90F505C3327D45C2506BC /* SmartShadowIOSApp.swift */; };
+		42C5431720DB09DCC0CD1A09 /* SmartShadowShared.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FC342CCE807D804B47E17B32 /* SmartShadowShared.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		4394B4016ADF9C4A31044A2B /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EAC534A7462E8173D2F38 /* AudioRecorder.swift */; };
+		4791C63502960C3EFF95125E /* GitHubOAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B2A50925CA9C9D5797E641 /* GitHubOAuthService.swift */; };
+		483FF94CB31950FF2C8DA0D7 /* SmartShadowGitHubAPI_macOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2487697F0D456A55A26E54D3 /* SmartShadowGitHubAPI_macOS.framework */; };
+		4A1BC1F0E77E8293B866C31C /* MacRuntimeMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29A63E08D6B220A7BEDF748 /* MacRuntimeMode.swift */; };
+		4FDC82F5098E4D18F735FA77 /* LoginWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B6F4693AD562EB8D589404 /* LoginWindowController.swift */; };
+		518A02EDF113889ABF953D05 /* ShadowGitHubActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4851F483FFC5BC6896FFED /* ShadowGitHubActionExecutor.swift */; };
+		519B17D231125E9C21EEDDD0 /* GitHubClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21775E06910905FC6EA7EE64 /* GitHubClientTests.swift */; };
+		56B60CD8711E8590F55AA86E /* SmartShadowGitHubAPI_iOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5B210F80804568FD604BA72D /* SmartShadowGitHubAPI_macOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2487697F0D456A55A26E54D3 /* SmartShadowGitHubAPI_macOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5F211F342D322FA791E6FCA5 /* VoiceRecorderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E7A150CEBAE742BEAB0F3E1 /* VoiceRecorderService.swift */; };
+		5F22503D860EC8CC299DF0D1 /* ShadowOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5D58041F4A6967B32A4C3 /* ShadowOrbView.swift */; };
+		5F887382D17221605ED8A1A1 /* SmartShadowShared_iOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		663F8197479D7B159D29F25D /* MacGlobalHotkeyAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9FDD48CC017F60E541CB0F /* MacGlobalHotkeyAdapter.swift */; };
+		6947658708990F2B255B14E5 /* SmartShadowIssueParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E33A04AF75DA873582D4F3E /* SmartShadowIssueParser.swift */; };
+		6B41424462BDB0739FB77BA1 /* IssueStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D55FFE4D1D72358B877C4FC /* IssueStateMachine.swift */; };
+		6EBA77729B6B3699433F14D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DCC3DB4D372D31DB963968D1 /* Assets.xcassets */; };
+		779BA58676A702064501A492 /* SmartShadowShared_iOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		77A0815D7DB9F210B8704766 /* LoginWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0553E7F12DE06E2AD76A8D /* LoginWindowView.swift */; };
+		84C99C047698D01FB9C08BA7 /* MacCompanionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CCDC019D86B0D7AFBF60A5 /* MacCompanionModel.swift */; };
+		871E5DC88E29C90611B7536B /* VoiceWaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC27A8754D229D2BB2D7B9CB /* VoiceWaveView.swift */; };
+		8B490585C8A1095FA9AC800D /* DeliveryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91B0933CBE3528F91689F62 /* DeliveryHistoryStore.swift */; };
+		8C89E8388B6B3E48C9D6FC04 /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 42A8DB4986A75E6B0BFEADE4 /* Speech.framework */; };
+		8D78F51DBFC2240223AC8E03 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7262C71BC4886F700F90E30 /* SettingsView.swift */; };
+		9062B45F02D9509EA1C08806 /* ShadowRepoClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = E280910629DA9CFDD7C380DC /* ShadowRepoClassifier.swift */; };
+		946C7BE9BFFD931014471801 /* VoiceWaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC27A8754D229D2BB2D7B9CB /* VoiceWaveView.swift */; };
+		949635E788DE5DBB6F172441 /* SmartShadowShared_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */; };
+		94A895A987D8F18A0580805E /* VoiceTaskSubmissionContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6556BF21BA500FD51E1BAD /* VoiceTaskSubmissionContractTests.swift */; };
+		9950E50D59A1EFFE67FB5701 /* GitHubSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C662A4D72C1628F6BDD09B8C /* GitHubSettings.swift */; };
+		9DBA9D637911894152D55535 /* ShadowGitHubAppClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4DE8D20A9D5F6C032CE6A9 /* ShadowGitHubAppClient.swift */; };
+		9FC4137973F54DF23538A47E /* GitHubOAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B2A50925CA9C9D5797E641 /* GitHubOAuthService.swift */; };
+		A0A0EF31CC05FCC0FF600E36 /* LocalVoiceProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19FD495F04F7A70E806DABF /* LocalVoiceProcessing.swift */; };
+		A81B68812C98EDC1ABC072E8 /* ShadowGitHubAppClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4DE8D20A9D5F6C032CE6A9 /* ShadowGitHubAppClient.swift */; };
+		B29141BDCFB6BD99D2FD11F4 /* ShadowColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 414DDAD9D74A3F238CB7D204 /* ShadowColors.swift */; };
+		BBAC2DEA9398241CAB4EEFBD /* ShadowGitHubActionPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2CD31CC062B47758325959 /* ShadowGitHubActionPlanner.swift */; };
+		C1993BA17C4F9290FB744865 /* GitHubInboxUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D3B73E110EDE00991AA69A8 /* GitHubInboxUploader.swift */; };
+		C244E027717E3F8C7B697A5B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0CD52EA1CC3B443F4E0C0612 /* Assets.xcassets */; };
+		C9128979A40FC0F590C1E15D /* ShadowConsoleStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD5E2DDADA92A192077AB8A /* ShadowConsoleStoreTests.swift */; };
+		CB05B2C9E2AE004AF0FD640B /* VoiceTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9607A18000BB2A5A8D2B01CA /* VoiceTaskView.swift */; };
+		CB52877CD467321CCD9DE309 /* SmartShadowShared_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */; };
+		CD0E401919110AC68BDD8300 /* ShadowGitHubActionPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2CD31CC062B47758325959 /* ShadowGitHubActionPlanner.swift */; };
+		CE1F502DE17ADFFDB37A8401 /* SmartShadowCompanionMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C5FC84135EEA63EAA125A6 /* SmartShadowCompanionMacApp.swift */; };
+		D21FA224425E70BAB19B36F0 /* MacShadowConsoleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2F549AEF116EEE9EE50EF8 /* MacShadowConsoleUITests.swift */; };
+		D46CD4167EC0507F2F2079E9 /* GitHubAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C272A09A217E4B90911815C /* GitHubAPIClient.swift */; };
+		D6235A49539A57443C4167D5 /* ChatTypeCLIProcessingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A3E723DD1105E4C2158A79 /* ChatTypeCLIProcessingClient.swift */; };
+		D6DFC8FEF85D5C8A48A5A1F2 /* VoicePacketMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFF145A3CAFFE5076A19958 /* VoicePacketMetadata.swift */; };
+		D783D9B79A7F9D62786EE129 /* VoicePacketMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFF145A3CAFFE5076A19958 /* VoicePacketMetadata.swift */; };
+		D7B63BF8F15744B34612494A /* RecordHoldSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14532608FB533110C4A2F0F3 /* RecordHoldSurface.swift */; };
+		D82C39B19ED6427D9A246DFB /* HotkeyOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE0E648FB9FAAEEC185E7D9 /* HotkeyOverlayView.swift */; };
+		D88DFF4E8F6AAD3B1A5FB40C /* DeliveryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91B0933CBE3528F91689F62 /* DeliveryHistoryStore.swift */; };
+		DB0C5F546658B45ECF8DD4C2 /* GitHubOAuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56E7E862FE4C57A7F8CD345 /* GitHubOAuthServiceTests.swift */; };
+		E207F18B136F970B9DDDC4AD /* ShadowRepoClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = E280910629DA9CFDD7C380DC /* ShadowRepoClassifier.swift */; };
+		E281D015C8A109075BA0CF8C /* SmartShadowGitHubAPI_iOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		EEA895F29480A1A9E5A741B5 /* SmartShadowGitHubAPI_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */; };
+		EF7D1CE25500F75A98F18BB8 /* GitHubSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C662A4D72C1628F6BDD09B8C /* GitHubSettings.swift */; };
+		F078D257BBCE13A303EFB45F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8995090862F0D415445334 /* Models.swift */; };
+		F092ACB8985D2053E315D1A5 /* ShadowColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 414DDAD9D74A3F238CB7D204 /* ShadowColors.swift */; };
+		FA33103CC499A07F8A825626 /* VoicePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2C9EC684B2876CFC5AFA92 /* VoicePanelView.swift */; };
+		FA996E7F2A327C8350725B66 /* LocalVoiceProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19FD495F04F7A70E806DABF /* LocalVoiceProcessing.swift */; };
+		FBEA8FFFA1FF492C18412F20 /* SmartShadowIssueParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E33A04AF75DA873582D4F3E /* SmartShadowIssueParser.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		149E3C93078B22CFD50C3B5C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 217B04ED321D37E262641E97;
+			remoteInfo = SmartShadowShared;
+		};
+		42F97A9A827682B7A64DFC1C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7D4A7FF3B0C1B44DDF6A868A;
+			remoteInfo = SmartShadowShared_iOS;
+		};
+		508C7A76AFD49F9AA2D8A299 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CD46EDED5230FE0AF839F96F;
+			remoteInfo = SmartShadowGitHubAPI_macOS;
+		};
+		6F69AEAE1C2E14862848E489 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 28DFA1E8CAB41A627C3693CF;
+			remoteInfo = SmartShadowIOS;
+		};
+		7F9CF379AF84A314A8EDDA9C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F3CCCE90F5D503568F15BAF8;
+			remoteInfo = SmartShadowGitHubAPI_iOS;
+		};
+		A24CEDCDB166D77B50DAC805 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 19A3C467CC1D23AD6ADD1746;
+			remoteInfo = SmartShadowCompanionMac;
+		};
+		B6949E071712E25A4730170D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 28DFA1E8CAB41A627C3693CF;
+			remoteInfo = SmartShadowIOS;
+		};
+		C8C653C9AE4CE670184B4F6F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7D4A7FF3B0C1B44DDF6A868A;
+			remoteInfo = SmartShadowShared_iOS;
+		};
+		E14939A6E874F8CDD1308970 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F3CCCE90F5D503568F15BAF8;
+			remoteInfo = SmartShadowGitHubAPI_iOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		70451B61E80C143FC5CD01EC /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				56B60CD8711E8590F55AA86E /* SmartShadowGitHubAPI_iOS.framework in Embed Frameworks */,
+				5F887382D17221605ED8A1A1 /* SmartShadowShared_iOS.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		98344D1837120A1B89E08A75 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				5B210F80804568FD604BA72D /* SmartShadowGitHubAPI_macOS.framework in Embed Frameworks */,
+				42C5431720DB09DCC0CD1A09 /* SmartShadowShared.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B038F0F1C8E2BD599BC83C1B /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E281D015C8A109075BA0CF8C /* SmartShadowGitHubAPI_iOS.framework in Embed Frameworks */,
+				779BA58676A702064501A492 /* SmartShadowShared_iOS.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0C272A09A217E4B90911815C /* GitHubAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAPIClient.swift; sourceTree = "<group>"; };
+		0CD52EA1CC3B443F4E0C0612 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0CD90F505C3327D45C2506BC /* SmartShadowIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartShadowIOSApp.swift; sourceTree = "<group>"; };
+		0E8995090862F0D415445334 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		0F2CD31CC062B47758325959 /* ShadowGitHubActionPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowGitHubActionPlanner.swift; sourceTree = "<group>"; };
+		14532608FB533110C4A2F0F3 /* RecordHoldSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordHoldSurface.swift; sourceTree = "<group>"; };
+		18C5FC84135EEA63EAA125A6 /* SmartShadowCompanionMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartShadowCompanionMacApp.swift; sourceTree = "<group>"; };
+		1D55FFE4D1D72358B877C4FC /* IssueStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueStateMachine.swift; sourceTree = "<group>"; };
+		21775E06910905FC6EA7EE64 /* GitHubClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubClientTests.swift; sourceTree = "<group>"; };
+		2487697F0D456A55A26E54D3 /* SmartShadowGitHubAPI_macOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SmartShadowGitHubAPI_macOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		2E7A150CEBAE742BEAB0F3E1 /* VoiceRecorderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorderService.swift; sourceTree = "<group>"; };
+		3C00F77A46D725D6CE035FDE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3D3B73E110EDE00991AA69A8 /* GitHubInboxUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubInboxUploader.swift; sourceTree = "<group>"; };
+		3DC6288E2E3D0AA6530B1A1C /* SmartShadowCompanionMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SmartShadowCompanionMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E33A04AF75DA873582D4F3E /* SmartShadowIssueParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartShadowIssueParser.swift; sourceTree = "<group>"; };
+		3E4DE8D20A9D5F6C032CE6A9 /* ShadowGitHubAppClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowGitHubAppClient.swift; sourceTree = "<group>"; };
+		414DDAD9D74A3F238CB7D204 /* ShadowColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowColors.swift; sourceTree = "<group>"; };
+		42A8DB4986A75E6B0BFEADE4 /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = System/Library/Frameworks/Speech.framework; sourceTree = SDKROOT; };
+		4B97FA8385E24A3FABCB0968 /* SmartShadowIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SmartShadowIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BC45042F5875630C91E5024 /* HotkeyOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyOverlayController.swift; sourceTree = "<group>"; };
+		5BD5E2DDADA92A192077AB8A /* ShadowConsoleStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowConsoleStoreTests.swift; sourceTree = "<group>"; };
+		5C2C9EC684B2876CFC5AFA92 /* VoicePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePanelView.swift; sourceTree = "<group>"; };
+		5C2F549AEF116EEE9EE50EF8 /* MacShadowConsoleUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacShadowConsoleUITests.swift; sourceTree = "<group>"; };
+		5CFF145A3CAFFE5076A19958 /* VoicePacketMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePacketMetadata.swift; sourceTree = "<group>"; };
+		5FE0E648FB9FAAEEC185E7D9 /* HotkeyOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyOverlayView.swift; sourceTree = "<group>"; };
+		74A3E723DD1105E4C2158A79 /* ChatTypeCLIProcessingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTypeCLIProcessingClient.swift; sourceTree = "<group>"; };
+		799E0B5B1C608B6544141ECA /* ShadowConsoleUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowConsoleUITests.swift; sourceTree = "<group>"; };
+		842DB39D9C14A4829C131393 /* SmartShadowCompanionMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SmartShadowCompanionMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		84463B91D90564CCBBE27B5B /* SmartShadowIOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SmartShadowIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9607A18000BB2A5A8D2B01CA /* VoiceTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTaskView.swift; sourceTree = "<group>"; };
+		9A4851F483FFC5BC6896FFED /* ShadowGitHubActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowGitHubActionExecutor.swift; sourceTree = "<group>"; };
+		A19FD495F04F7A70E806DABF /* LocalVoiceProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVoiceProcessing.swift; sourceTree = "<group>"; };
+		A484B40E504738F73313F8E1 /* SmartShadowIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SmartShadowIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A7262C71BC4886F700F90E30 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AE9FDD48CC017F60E541CB0F /* MacGlobalHotkeyAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacGlobalHotkeyAdapter.swift; sourceTree = "<group>"; };
+		B4CCDC019D86B0D7AFBF60A5 /* MacCompanionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCompanionModel.swift; sourceTree = "<group>"; };
+		B56E7E862FE4C57A7F8CD345 /* GitHubOAuthServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthServiceTests.swift; sourceTree = "<group>"; };
+		B7B6F4693AD562EB8D589404 /* LoginWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginWindowController.swift; sourceTree = "<group>"; };
+		B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SmartShadowGitHubAPI_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C662A4D72C1628F6BDD09B8C /* GitHubSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubSettings.swift; sourceTree = "<group>"; };
+		CAF5D58041F4A6967B32A4C3 /* ShadowOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowOrbView.swift; sourceTree = "<group>"; };
+		CB3B6C29B5249028A991D98F /* SmartShadowIOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SmartShadowIOS.entitlements; sourceTree = "<group>"; };
+		CE3EAC534A7462E8173D2F38 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		D9B2A50925CA9C9D5797E641 /* GitHubOAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthService.swift; sourceTree = "<group>"; };
+		DC27A8754D229D2BB2D7B9CB /* VoiceWaveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceWaveView.swift; sourceTree = "<group>"; };
+		DCC3DB4D372D31DB963968D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E280910629DA9CFDD7C380DC /* ShadowRepoClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowRepoClassifier.swift; sourceTree = "<group>"; };
+		E29A63E08D6B220A7BEDF748 /* MacRuntimeMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRuntimeMode.swift; sourceTree = "<group>"; };
+		EA6556BF21BA500FD51E1BAD /* VoiceTaskSubmissionContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTaskSubmissionContractTests.swift; sourceTree = "<group>"; };
+		F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SmartShadowShared_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F91B0933CBE3528F91689F62 /* DeliveryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryHistoryStore.swift; sourceTree = "<group>"; };
+		FC342CCE807D804B47E17B32 /* SmartShadowShared.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SmartShadowShared.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD0553E7F12DE06E2AD76A8D /* LoginWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginWindowView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		78DC41B4F2E0B16FD2CDF5B0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1D3CC09CBBD50ED5D11A7CAE /* SmartShadowGitHubAPI_iOS.framework in Frameworks */,
+				949635E788DE5DBB6F172441 /* SmartShadowShared_iOS.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C87C9AF523DE2F4F5026E14B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				483FF94CB31950FF2C8DA0D7 /* SmartShadowGitHubAPI_macOS.framework in Frameworks */,
+				0732608A429ADA4052F1F06E /* SmartShadowShared.framework in Frameworks */,
+				8C89E8388B6B3E48C9D6FC04 /* Speech.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCD13809C2731B4FFFF72E3C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EEA895F29480A1A9E5A741B5 /* SmartShadowGitHubAPI_iOS.framework in Frameworks */,
+				CB52877CD467321CCD9DE309 /* SmartShadowShared_iOS.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		069EAFF7959A244E4A0374EA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				42A8DB4986A75E6B0BFEADE4 /* Speech.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		0E0DA1F1549167E5316959A1 /* SmartShadowShared */ = {
+			isa = PBXGroup;
+			children = (
+				15A5C4B84EE586619C874101 /* Models */,
+				3288AD427CA442489E920DF3 /* Services */,
+				A2B4C6DBEAB6D8317098831A /* Stores */,
+				EAE586BA5E4DE4DEE1CA975A /* Views */,
+			);
+			name = SmartShadowShared;
+			path = Sources/SmartShadowShared;
+			sourceTree = "<group>";
+		};
+		15A5C4B84EE586619C874101 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1D55FFE4D1D72358B877C4FC /* IssueStateMachine.swift */,
+				9A4851F483FFC5BC6896FFED /* ShadowGitHubActionExecutor.swift */,
+				0F2CD31CC062B47758325959 /* ShadowGitHubActionPlanner.swift */,
+				E280910629DA9CFDD7C380DC /* ShadowRepoClassifier.swift */,
+				3E33A04AF75DA873582D4F3E /* SmartShadowIssueParser.swift */,
+				5CFF145A3CAFFE5076A19958 /* VoicePacketMetadata.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		3288AD427CA442489E920DF3 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				74A3E723DD1105E4C2158A79 /* ChatTypeCLIProcessingClient.swift */,
+				3D3B73E110EDE00991AA69A8 /* GitHubInboxUploader.swift */,
+				A19FD495F04F7A70E806DABF /* LocalVoiceProcessing.swift */,
+				2E7A150CEBAE742BEAB0F3E1 /* VoiceRecorderService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		4E34DD76418AD675F1C5DA17 /* SmartShadowGitHubAPI */ = {
+			isa = PBXGroup;
+			children = (
+				0C272A09A217E4B90911815C /* GitHubAPIClient.swift */,
+				D9B2A50925CA9C9D5797E641 /* GitHubOAuthService.swift */,
+				3E4DE8D20A9D5F6C032CE6A9 /* ShadowGitHubAppClient.swift */,
+			);
+			name = SmartShadowGitHubAPI;
+			path = Sources/SmartShadowGitHubAPI;
+			sourceTree = "<group>";
+		};
+		7DAD920811801E30D41D592B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				842DB39D9C14A4829C131393 /* SmartShadowCompanionMac.app */,
+				3DC6288E2E3D0AA6530B1A1C /* SmartShadowCompanionMacUITests.xctest */,
+				B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */,
+				2487697F0D456A55A26E54D3 /* SmartShadowGitHubAPI_macOS.framework */,
+				A484B40E504738F73313F8E1 /* SmartShadowIOS.app */,
+				4B97FA8385E24A3FABCB0968 /* SmartShadowIOSTests.xctest */,
+				84463B91D90564CCBBE27B5B /* SmartShadowIOSUITests.xctest */,
+				F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */,
+				FC342CCE807D804B47E17B32 /* SmartShadowShared.framework */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		94851DF98D8DB6A61819D1FF /* SmartShadowIOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				21775E06910905FC6EA7EE64 /* GitHubClientTests.swift */,
+				B56E7E862FE4C57A7F8CD345 /* GitHubOAuthServiceTests.swift */,
+				5BD5E2DDADA92A192077AB8A /* ShadowConsoleStoreTests.swift */,
+				EA6556BF21BA500FD51E1BAD /* VoiceTaskSubmissionContractTests.swift */,
+			);
+			name = SmartShadowIOSTests;
+			path = tests/SmartShadowIOSTests;
+			sourceTree = "<group>";
+		};
+		A2B4C6DBEAB6D8317098831A /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				F91B0933CBE3528F91689F62 /* DeliveryHistoryStore.swift */,
+				C662A4D72C1628F6BDD09B8C /* GitHubSettings.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		B3E2103F4645E7DE56A3AD5B /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AE9FDD48CC017F60E541CB0F /* MacGlobalHotkeyAdapter.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		B7ADE25A06A9393F95B7F6F0 /* SmartShadowCompanionMacUITests */ = {
+			isa = PBXGroup;
+			children = (
+				5C2F549AEF116EEE9EE50EF8 /* MacShadowConsoleUITests.swift */,
+			);
+			name = SmartShadowCompanionMacUITests;
+			path = tests/SmartShadowCompanionMacUITests;
+			sourceTree = "<group>";
+		};
+		C8A99990B35B5393FEEECA51 /* SmartShadowIOS */ = {
+			isa = PBXGroup;
+			children = (
+				0CD52EA1CC3B443F4E0C0612 /* Assets.xcassets */,
+				CE3EAC534A7462E8173D2F38 /* AudioRecorder.swift */,
+				3C00F77A46D725D6CE035FDE /* Info.plist */,
+				0E8995090862F0D415445334 /* Models.swift */,
+				CB3B6C29B5249028A991D98F /* SmartShadowIOS.entitlements */,
+				0CD90F505C3327D45C2506BC /* SmartShadowIOSApp.swift */,
+				9607A18000BB2A5A8D2B01CA /* VoiceTaskView.swift */,
+			);
+			name = SmartShadowIOS;
+			path = Sources/SmartShadowIOS;
+			sourceTree = "<group>";
+		};
+		D08196DE2B85853DA4AF68D0 = {
+			isa = PBXGroup;
+			children = (
+				FA6C97110C7CAB7464F3EA4F /* SmartShadowCompanionMac */,
+				B7ADE25A06A9393F95B7F6F0 /* SmartShadowCompanionMacUITests */,
+				4E34DD76418AD675F1C5DA17 /* SmartShadowGitHubAPI */,
+				C8A99990B35B5393FEEECA51 /* SmartShadowIOS */,
+				94851DF98D8DB6A61819D1FF /* SmartShadowIOSTests */,
+				E878A814878A1D522A29D218 /* SmartShadowIOSUITests */,
+				0E0DA1F1549167E5316959A1 /* SmartShadowShared */,
+				069EAFF7959A244E4A0374EA /* Frameworks */,
+				7DAD920811801E30D41D592B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E827FA7A81CA3809210C6730 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5BC45042F5875630C91E5024 /* HotkeyOverlayController.swift */,
+				B7B6F4693AD562EB8D589404 /* LoginWindowController.swift */,
+				B4CCDC019D86B0D7AFBF60A5 /* MacCompanionModel.swift */,
+				E29A63E08D6B220A7BEDF748 /* MacRuntimeMode.swift */,
+				18C5FC84135EEA63EAA125A6 /* SmartShadowCompanionMacApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E878A814878A1D522A29D218 /* SmartShadowIOSUITests */ = {
+			isa = PBXGroup;
+			children = (
+				799E0B5B1C608B6544141ECA /* ShadowConsoleUITests.swift */,
+			);
+			name = SmartShadowIOSUITests;
+			path = tests/SmartShadowIOSUITests;
+			sourceTree = "<group>";
+		};
+		EAE586BA5E4DE4DEE1CA975A /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				414DDAD9D74A3F238CB7D204 /* ShadowColors.swift */,
+				CAF5D58041F4A6967B32A4C3 /* ShadowOrbView.swift */,
+				DC27A8754D229D2BB2D7B9CB /* VoiceWaveView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		EEA65F8D01B27F6DE505932A /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				5FE0E648FB9FAAEEC185E7D9 /* HotkeyOverlayView.swift */,
+				FD0553E7F12DE06E2AD76A8D /* LoginWindowView.swift */,
+				14532608FB533110C4A2F0F3 /* RecordHoldSurface.swift */,
+				A7262C71BC4886F700F90E30 /* SettingsView.swift */,
+				5C2C9EC684B2876CFC5AFA92 /* VoicePanelView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		FA6C97110C7CAB7464F3EA4F /* SmartShadowCompanionMac */ = {
+			isa = PBXGroup;
+			children = (
+				DCC3DB4D372D31DB963968D1 /* Assets.xcassets */,
+				E827FA7A81CA3809210C6730 /* App */,
+				B3E2103F4645E7DE56A3AD5B /* Services */,
+				EEA65F8D01B27F6DE505932A /* Views */,
+			);
+			name = SmartShadowCompanionMac;
+			path = Sources/SmartShadowCompanionMac;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		05C83B9D60B174C35087F76D /* SmartShadowIOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0D8D6C7002C8C0616254EA62 /* Build configuration list for PBXNativeTarget "SmartShadowIOSTests" */;
+			buildPhases = (
+				2E0706128BD26CBECBC8E4A1 /* Sources */,
+				DCD13809C2731B4FFFF72E3C /* Frameworks */,
+				70451B61E80C143FC5CD01EC /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				06D0CAC6C6EB5FE8CC067016 /* PBXTargetDependency */,
+				8DB8E3D8753D7DC7316465CC /* PBXTargetDependency */,
+				4DFFEAF2FF43A487ECB63BED /* PBXTargetDependency */,
+			);
+			name = SmartShadowIOSTests;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowIOSTests;
+			productReference = 4B97FA8385E24A3FABCB0968 /* SmartShadowIOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		19A3C467CC1D23AD6ADD1746 /* SmartShadowCompanionMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9792CCECBD08D0E90B337371 /* Build configuration list for PBXNativeTarget "SmartShadowCompanionMac" */;
+			buildPhases = (
+				326178F54417467076AE9A9E /* Sources */,
+				0E39CC5466BCE53B44524881 /* Resources */,
+				C87C9AF523DE2F4F5026E14B /* Frameworks */,
+				98344D1837120A1B89E08A75 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9758AF679A0F692618488B8D /* PBXTargetDependency */,
+				FD2F1DCA2BB09F44B386E87C /* PBXTargetDependency */,
+			);
+			name = SmartShadowCompanionMac;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowCompanionMac;
+			productReference = 842DB39D9C14A4829C131393 /* SmartShadowCompanionMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		217B04ED321D37E262641E97 /* SmartShadowShared */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 278EAA7F2A18055D5C11DDDA /* Build configuration list for PBXNativeTarget "SmartShadowShared" */;
+			buildPhases = (
+				0E5A08C616D164CBDCDCAE12 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartShadowShared;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowShared;
+			productReference = FC342CCE807D804B47E17B32 /* SmartShadowShared.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		28DFA1E8CAB41A627C3693CF /* SmartShadowIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DAD5A68E2BB7C7539D7D71A1 /* Build configuration list for PBXNativeTarget "SmartShadowIOS" */;
+			buildPhases = (
+				858CE9E626464D3BE20CCABA /* Sources */,
+				B8EFCD711C6D4E8B77C4535C /* Resources */,
+				78DC41B4F2E0B16FD2CDF5B0 /* Frameworks */,
+				B038F0F1C8E2BD599BC83C1B /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CD75787181E8A84B7FA1F833 /* PBXTargetDependency */,
+				0472455C21F7E5B8055EE761 /* PBXTargetDependency */,
+			);
+			name = SmartShadowIOS;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowIOS;
+			productReference = A484B40E504738F73313F8E1 /* SmartShadowIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4AB00F323D60D6E7A17F34EC /* SmartShadowCompanionMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 16B26BAC1060017827F8CC88 /* Build configuration list for PBXNativeTarget "SmartShadowCompanionMacUITests" */;
+			buildPhases = (
+				CF52C65FD528E6A06D06EF15 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BF0D9CF4BB733F4576FC2F8E /* PBXTargetDependency */,
+			);
+			name = SmartShadowCompanionMacUITests;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowCompanionMacUITests;
+			productReference = 3DC6288E2E3D0AA6530B1A1C /* SmartShadowCompanionMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		7D4A7FF3B0C1B44DDF6A868A /* SmartShadowShared_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 73D28C397724510944882B15 /* Build configuration list for PBXNativeTarget "SmartShadowShared_iOS" */;
+			buildPhases = (
+				5BB372ABA3922A07D9827B78 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartShadowShared_iOS;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowShared_iOS;
+			productReference = F51DD4AE0A4E215058B796EA /* SmartShadowShared_iOS.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		B61870EFD31734766E7BF893 /* SmartShadowIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8BC18FA6F54F849531DF0274 /* Build configuration list for PBXNativeTarget "SmartShadowIOSUITests" */;
+			buildPhases = (
+				14F5F1A2FF941C3EDECC2464 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8238F75445D3A35784FFF8F6 /* PBXTargetDependency */,
+			);
+			name = SmartShadowIOSUITests;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowIOSUITests;
+			productReference = 84463B91D90564CCBBE27B5B /* SmartShadowIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CD46EDED5230FE0AF839F96F /* SmartShadowGitHubAPI_macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1E765939212D3C03337CBD77 /* Build configuration list for PBXNativeTarget "SmartShadowGitHubAPI_macOS" */;
+			buildPhases = (
+				CD00EF8E4035673B7FD7CF7C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartShadowGitHubAPI_macOS;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowGitHubAPI_macOS;
+			productReference = 2487697F0D456A55A26E54D3 /* SmartShadowGitHubAPI_macOS.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		F3CCCE90F5D503568F15BAF8 /* SmartShadowGitHubAPI_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 895736B8B9F7A5D0E4DB9FAF /* Build configuration list for PBXNativeTarget "SmartShadowGitHubAPI_iOS" */;
+			buildPhases = (
+				7FE8EAFCA315AA7D5862A975 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartShadowGitHubAPI_iOS;
+			packageProductDependencies = (
+			);
+			productName = SmartShadowGitHubAPI_iOS;
+			productReference = B9EA07F71A78E3DDEFABEC41 /* SmartShadowGitHubAPI_iOS.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		31F54CAD3BD9A6776FD5FEAD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					05C83B9D60B174C35087F76D = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					19A3C467CC1D23AD6ADD1746 = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					217B04ED321D37E262641E97 = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					28DFA1E8CAB41A627C3693CF = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					4AB00F323D60D6E7A17F34EC = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 19A3C467CC1D23AD6ADD1746;
+					};
+					7D4A7FF3B0C1B44DDF6A868A = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					B61870EFD31734766E7BF893 = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 28DFA1E8CAB41A627C3693CF;
+					};
+					CD46EDED5230FE0AF839F96F = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+					F3CCCE90F5D503568F15BAF8 = {
+						DevelopmentTeam = YRQ5DV25KM;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1AA4DE7D8C65205421CE7EA5 /* Build configuration list for PBXProject "SmartShadow" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = D08196DE2B85853DA4AF68D0;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 7DAD920811801E30D41D592B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				19A3C467CC1D23AD6ADD1746 /* SmartShadowCompanionMac */,
+				4AB00F323D60D6E7A17F34EC /* SmartShadowCompanionMacUITests */,
+				F3CCCE90F5D503568F15BAF8 /* SmartShadowGitHubAPI_iOS */,
+				CD46EDED5230FE0AF839F96F /* SmartShadowGitHubAPI_macOS */,
+				28DFA1E8CAB41A627C3693CF /* SmartShadowIOS */,
+				05C83B9D60B174C35087F76D /* SmartShadowIOSTests */,
+				B61870EFD31734766E7BF893 /* SmartShadowIOSUITests */,
+				217B04ED321D37E262641E97 /* SmartShadowShared */,
+				7D4A7FF3B0C1B44DDF6A868A /* SmartShadowShared_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0E39CC5466BCE53B44524881 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6EBA77729B6B3699433F14D4 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B8EFCD711C6D4E8B77C4535C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C244E027717E3F8C7B697A5B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0E5A08C616D164CBDCDCAE12 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A463D0D93E543A7ECAC34AF /* ChatTypeCLIProcessingClient.swift in Sources */,
+				8B490585C8A1095FA9AC800D /* DeliveryHistoryStore.swift in Sources */,
+				C1993BA17C4F9290FB744865 /* GitHubInboxUploader.swift in Sources */,
+				9950E50D59A1EFFE67FB5701 /* GitHubSettings.swift in Sources */,
+				3713F804F362FF505BFDF44A /* IssueStateMachine.swift in Sources */,
+				FA996E7F2A327C8350725B66 /* LocalVoiceProcessing.swift in Sources */,
+				F092ACB8985D2053E315D1A5 /* ShadowColors.swift in Sources */,
+				518A02EDF113889ABF953D05 /* ShadowGitHubActionExecutor.swift in Sources */,
+				BBAC2DEA9398241CAB4EEFBD /* ShadowGitHubActionPlanner.swift in Sources */,
+				5F22503D860EC8CC299DF0D1 /* ShadowOrbView.swift in Sources */,
+				9062B45F02D9509EA1C08806 /* ShadowRepoClassifier.swift in Sources */,
+				6947658708990F2B255B14E5 /* SmartShadowIssueParser.swift in Sources */,
+				D783D9B79A7F9D62786EE129 /* VoicePacketMetadata.swift in Sources */,
+				5F211F342D322FA791E6FCA5 /* VoiceRecorderService.swift in Sources */,
+				871E5DC88E29C90611B7536B /* VoiceWaveView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		14F5F1A2FF941C3EDECC2464 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3BB5D519F7397587B02B388A /* ShadowConsoleUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2E0706128BD26CBECBC8E4A1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				519B17D231125E9C21EEDDD0 /* GitHubClientTests.swift in Sources */,
+				DB0C5F546658B45ECF8DD4C2 /* GitHubOAuthServiceTests.swift in Sources */,
+				C9128979A40FC0F590C1E15D /* ShadowConsoleStoreTests.swift in Sources */,
+				94A895A987D8F18A0580805E /* VoiceTaskSubmissionContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		326178F54417467076AE9A9E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079B153DF7D75E87E936B425 /* HotkeyOverlayController.swift in Sources */,
+				D82C39B19ED6427D9A246DFB /* HotkeyOverlayView.swift in Sources */,
+				4FDC82F5098E4D18F735FA77 /* LoginWindowController.swift in Sources */,
+				77A0815D7DB9F210B8704766 /* LoginWindowView.swift in Sources */,
+				84C99C047698D01FB9C08BA7 /* MacCompanionModel.swift in Sources */,
+				663F8197479D7B159D29F25D /* MacGlobalHotkeyAdapter.swift in Sources */,
+				4A1BC1F0E77E8293B866C31C /* MacRuntimeMode.swift in Sources */,
+				D7B63BF8F15744B34612494A /* RecordHoldSurface.swift in Sources */,
+				8D78F51DBFC2240223AC8E03 /* SettingsView.swift in Sources */,
+				CE1F502DE17ADFFDB37A8401 /* SmartShadowCompanionMacApp.swift in Sources */,
+				FA33103CC499A07F8A825626 /* VoicePanelView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BB372ABA3922A07D9827B78 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6235A49539A57443C4167D5 /* ChatTypeCLIProcessingClient.swift in Sources */,
+				D88DFF4E8F6AAD3B1A5FB40C /* DeliveryHistoryStore.swift in Sources */,
+				2580A099D3CE500660F15231 /* GitHubInboxUploader.swift in Sources */,
+				EF7D1CE25500F75A98F18BB8 /* GitHubSettings.swift in Sources */,
+				6B41424462BDB0739FB77BA1 /* IssueStateMachine.swift in Sources */,
+				A0A0EF31CC05FCC0FF600E36 /* LocalVoiceProcessing.swift in Sources */,
+				B29141BDCFB6BD99D2FD11F4 /* ShadowColors.swift in Sources */,
+				19427DB5D19051050D132CC8 /* ShadowGitHubActionExecutor.swift in Sources */,
+				CD0E401919110AC68BDD8300 /* ShadowGitHubActionPlanner.swift in Sources */,
+				0F42FF062986BD3ADC02D261 /* ShadowOrbView.swift in Sources */,
+				E207F18B136F970B9DDDC4AD /* ShadowRepoClassifier.swift in Sources */,
+				FBEA8FFFA1FF492C18412F20 /* SmartShadowIssueParser.swift in Sources */,
+				D6DFC8FEF85D5C8A48A5A1F2 /* VoicePacketMetadata.swift in Sources */,
+				00CB3BDA84D530A9208D50D2 /* VoiceRecorderService.swift in Sources */,
+				946C7BE9BFFD931014471801 /* VoiceWaveView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7FE8EAFCA315AA7D5862A975 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B6510CA1A6B5CC69117AFE6 /* GitHubAPIClient.swift in Sources */,
+				9FC4137973F54DF23538A47E /* GitHubOAuthService.swift in Sources */,
+				A81B68812C98EDC1ABC072E8 /* ShadowGitHubAppClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		858CE9E626464D3BE20CCABA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4394B4016ADF9C4A31044A2B /* AudioRecorder.swift in Sources */,
+				F078D257BBCE13A303EFB45F /* Models.swift in Sources */,
+				3C9367F5CAA5EE407096A564 /* SmartShadowIOSApp.swift in Sources */,
+				CB05B2C9E2AE004AF0FD640B /* VoiceTaskView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD00EF8E4035673B7FD7CF7C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D46CD4167EC0507F2F2079E9 /* GitHubAPIClient.swift in Sources */,
+				4791C63502960C3EFF95125E /* GitHubOAuthService.swift in Sources */,
+				9DBA9D637911894152D55535 /* ShadowGitHubAppClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CF52C65FD528E6A06D06EF15 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D21FA224425E70BAB19B36F0 /* MacShadowConsoleUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0472455C21F7E5B8055EE761 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7D4A7FF3B0C1B44DDF6A868A /* SmartShadowShared_iOS */;
+			targetProxy = C8C653C9AE4CE670184B4F6F /* PBXContainerItemProxy */;
+		};
+		06D0CAC6C6EB5FE8CC067016 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 28DFA1E8CAB41A627C3693CF /* SmartShadowIOS */;
+			targetProxy = 6F69AEAE1C2E14862848E489 /* PBXContainerItemProxy */;
+		};
+		4DFFEAF2FF43A487ECB63BED /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7D4A7FF3B0C1B44DDF6A868A /* SmartShadowShared_iOS */;
+			targetProxy = 42F97A9A827682B7A64DFC1C /* PBXContainerItemProxy */;
+		};
+		8238F75445D3A35784FFF8F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 28DFA1E8CAB41A627C3693CF /* SmartShadowIOS */;
+			targetProxy = B6949E071712E25A4730170D /* PBXContainerItemProxy */;
+		};
+		8DB8E3D8753D7DC7316465CC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F3CCCE90F5D503568F15BAF8 /* SmartShadowGitHubAPI_iOS */;
+			targetProxy = 7F9CF379AF84A314A8EDDA9C /* PBXContainerItemProxy */;
+		};
+		9758AF679A0F692618488B8D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CD46EDED5230FE0AF839F96F /* SmartShadowGitHubAPI_macOS */;
+			targetProxy = 508C7A76AFD49F9AA2D8A299 /* PBXContainerItemProxy */;
+		};
+		BF0D9CF4BB733F4576FC2F8E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 19A3C467CC1D23AD6ADD1746 /* SmartShadowCompanionMac */;
+			targetProxy = A24CEDCDB166D77B50DAC805 /* PBXContainerItemProxy */;
+		};
+		CD75787181E8A84B7FA1F833 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F3CCCE90F5D503568F15BAF8 /* SmartShadowGitHubAPI_iOS */;
+			targetProxy = E14939A6E874F8CDD1308970 /* PBXContainerItemProxy */;
+		};
+		FD2F1DCA2BB09F44B386E87C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 217B04ED321D37E262641E97 /* SmartShadowShared */;
+			targetProxy = 149E3C93078B22CFD50C3B5C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		02380F581120BD02BDFE378A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.shared";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		090BF28168492DD93BACECD7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.github-api";
+				PRODUCT_MODULE_NAME = SmartShadowGitHubAPI;
+				PRODUCT_NAME = SmartShadowGitHubAPI;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		27A949B41995FFD6BE2D2477 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = YRQ5DV25KM;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		33E24AF796FA52891C6CC344 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.github-api.macos";
+				PRODUCT_MODULE_NAME = SmartShadowGitHubAPI;
+				PRODUCT_NAME = SmartShadowGitHubAPI;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		393CE20574DC229BE91EF516 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/SmartShadowIOS/SmartShadowIOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Sources/SmartShadowIOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow";
+				SDKROOT = iphoneos;
+				SMART_SHADOW_GITHUB_CLIENT_ID = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		39DE0D6654DF8C887E0DFF23 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = YRQ5DV25KM;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		4068CE48686657B084D22BD3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowIOSTests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SmartShadowIOS.app/SmartShadowIOS";
+			};
+			name = Debug;
+		};
+		41DF99458CEDCEB0230375C5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.shared.ios";
+				PRODUCT_MODULE_NAME = SmartShadowShared;
+				PRODUCT_NAME = SmartShadowShared;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		6EC5779459A54E79D6529EB0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowCompanionMacUITests;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				TEST_TARGET_NAME = SmartShadowCompanionMac;
+			};
+			name = Release;
+		};
+		7E683DC7CA9B081C9EE85A9B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/SmartShadowIOS/SmartShadowIOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Sources/SmartShadowIOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow";
+				SDKROOT = iphoneos;
+				SMART_SHADOW_GITHUB_CLIENT_ID = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		87452F068ACDA139CA622255 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowIOSUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SmartShadowIOS;
+			};
+			name = Release;
+		};
+		948578F31B2135ED2724F47F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.github-api";
+				PRODUCT_MODULE_NAME = SmartShadowGitHubAPI;
+				PRODUCT_NAME = SmartShadowGitHubAPI;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		9F3858750D63339DBD46075A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_GitHubOAuthClientID = "$(SMART_SHADOW_GITHUB_CLIENT_ID)";
+				INFOPLIST_KEY_LSUIElement = NO;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SmartShadow records voice input for local transcription and user-confirmed GitHub task submission.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "SmartShadow transcribes voice commands into reviewable GitHub operation suggestions.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.companion";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Release;
+		};
+		9F963D00125C5BDC50F59A35 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowCompanionMacUITests;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				TEST_TARGET_NAME = SmartShadowCompanionMac;
+			};
+			name = Debug;
+		};
+		A414F349B8D81DD9BC9C6AB3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_GitHubOAuthClientID = "$(SMART_SHADOW_GITHUB_CLIENT_ID)";
+				INFOPLIST_KEY_LSUIElement = NO;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SmartShadow records voice input for local transcription and user-confirmed GitHub task submission.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "SmartShadow transcribes voice commands into reviewable GitHub operation suggestions.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.companion";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Debug;
+		};
+		B1AEDCC6E8A54D16BAFF3935 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.shared";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		DBDE1B457F5D05D5F16A3EA6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowIOSTests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SmartShadowIOS.app/SmartShadowIOS";
+			};
+			name = Release;
+		};
+		E99D6AC59D09DD200FA45289 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.shared.ios";
+				PRODUCT_MODULE_NAME = SmartShadowShared;
+				PRODUCT_NAME = SmartShadowShared;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		EDE870235F6B0727484755D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.longbiaochen.smart-shadow.github-api.macos";
+				PRODUCT_MODULE_NAME = SmartShadowGitHubAPI;
+				PRODUCT_NAME = SmartShadowGitHubAPI;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		FB29C8B3B10B4C881AF07C62 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = me.longbiaochen.SmartShadowIOSUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SmartShadowIOS;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0D8D6C7002C8C0616254EA62 /* Build configuration list for PBXNativeTarget "SmartShadowIOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4068CE48686657B084D22BD3 /* Debug */,
+				DBDE1B457F5D05D5F16A3EA6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		16B26BAC1060017827F8CC88 /* Build configuration list for PBXNativeTarget "SmartShadowCompanionMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9F963D00125C5BDC50F59A35 /* Debug */,
+				6EC5779459A54E79D6529EB0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1AA4DE7D8C65205421CE7EA5 /* Build configuration list for PBXProject "SmartShadow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				27A949B41995FFD6BE2D2477 /* Debug */,
+				39DE0D6654DF8C887E0DFF23 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1E765939212D3C03337CBD77 /* Build configuration list for PBXNativeTarget "SmartShadowGitHubAPI_macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33E24AF796FA52891C6CC344 /* Debug */,
+				EDE870235F6B0727484755D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		278EAA7F2A18055D5C11DDDA /* Build configuration list for PBXNativeTarget "SmartShadowShared" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1AEDCC6E8A54D16BAFF3935 /* Debug */,
+				02380F581120BD02BDFE378A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		73D28C397724510944882B15 /* Build configuration list for PBXNativeTarget "SmartShadowShared_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E99D6AC59D09DD200FA45289 /* Debug */,
+				41DF99458CEDCEB0230375C5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		895736B8B9F7A5D0E4DB9FAF /* Build configuration list for PBXNativeTarget "SmartShadowGitHubAPI_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				090BF28168492DD93BACECD7 /* Debug */,
+				948578F31B2135ED2724F47F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8BC18FA6F54F849531DF0274 /* Build configuration list for PBXNativeTarget "SmartShadowIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FB29C8B3B10B4C881AF07C62 /* Debug */,
+				87452F068ACDA139CA622255 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9792CCECBD08D0E90B337371 /* Build configuration list for PBXNativeTarget "SmartShadowCompanionMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A414F349B8D81DD9BC9C6AB3 /* Debug */,
+				9F3858750D63339DBD46075A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DAD5A68E2BB7C7539D7D71A1 /* Build configuration list for PBXNativeTarget "SmartShadowIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				393CE20574DC229BE91EF516 /* Debug */,
+				7E683DC7CA9B081C9EE85A9B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 31F54CAD3BD9A6776FD5FEAD /* Project object */;
+}

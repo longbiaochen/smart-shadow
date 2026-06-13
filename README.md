@@ -1,39 +1,42 @@
 # Smart Shadow
 
-Smart Shadow is a Swift-native macOS assistant core. It ingests local and authorized cloud signals, applies an auditable rule registry, prepares review work, and projects important items into Apple Reminders and Apple Calendar through EventKit.
+Smart Shadow is an iPhone-first personal task entry app backed by a local `shadowd` execution loop. The core experience is a single voice button: the user speaks a task, the app transcribes and polishes it locally, the user confirms the final text, and the unified agent identity `shadow` drives the work through GitHub Issue / PR / Comment records.
 
-The project is intentionally local-first: runtime state, audit logs, reports, and personal source data stay under ignored local paths. The public repository contains the core, rules, examples, and documentation.
+The product is not a chat app, a replacement for GitHub, or a full project-management suite. It shortens the path from "I thought of a task" to "an agent has started, is reporting progress, and can be reviewed."
+
+The current repository also contains the local Swift-native Mac capabilities that make the loop auditable: `shadowd`, CLI controls, launchd lifecycle support, GitHub issue handling, EventKit projections, local logs, and source/rule diagnostics. Runtime state, audit logs, reports, and personal source data stay under ignored local paths. The public repository contains the app, daemon, rules, examples, and documentation.
+
+The source PRD is saved in [docs/PRD.md](docs/PRD.md).
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph L0["Layer 0: Service lifecycle"]
+    subgraph L0["Layer 0: iPhone task entry"]
+        IOS["SmartShadowIOS"]
+        Voice["single voice button"]
+        LocalVoice["local ChatType ASR/polish"]
+        Confirm["task confirmation"]
+    end
+
+    subgraph L1["Layer 1: GitHub task record"]
+        Issue["GitHub Issue"]
+        Comment["Issue comments"]
+        PR["Pull Request"]
+        Project["Project status"]
+    end
+
+    subgraph L2["Layer 2: local shadowd"]
         Launchd["launchd service"]
-        CLI["Operator CLI and menu app"]
+        D["shadowd"]
+        Route["project/repo routing"]
+        Codex["local Codex agent"]
     end
 
-    subgraph L1["Layer 1: Sensing sources"]
-        Inbox["JSON event inbox"]
-        Files["File metadata"]
-        Lark["Lark agenda and task reads"]
-        Bookmarks["Browser bookmark metadata"]
-        RemindersIn["EventKit Reminders read"]
-        Mail["Mail summary and Mail.app intake"]
-        Signals["Accepted source signals"]
-    end
-
-    subgraph L2["Layer 2: Swift Mac Core"]
-        Ingest["Ingest and dedupe"]
-        Rules["Rule registry"]
-        Decide["Domain, priority, risk, action"]
-        Project["Projection engine"]
-        Execute["Approved local executors"]
-    end
-
-    subgraph L3["Layer 3: Work surfaces"]
-        R["Reminders: review and action"]
-        C["Calendar: time blocks and milestones"]
+    subgraph L3["Layer 3: optional local work surfaces"]
+        R["Reminders: review/action"]
+        C["Calendar: time blocks"]
+        CLI["operator CLI/menu"]
     end
 
     subgraph L4["Layer 4: Local evidence"]
@@ -43,24 +46,22 @@ flowchart TB
         Feedback["Rule feedback ledger"]
     end
 
-    Launchd --> Ingest
-    CLI --> Ingest
-    CLI --> Reports
-    Inbox --> Signals
-    Files --> Signals
-    Lark --> Signals
-    Bookmarks --> Signals
-    RemindersIn --> Signals
-    Mail --> Signals
-    Signals --> Ingest
-    Ingest --> Rules --> Decide --> Project
-    Decide --> Execute
-    Project -->|EventKit| R
-    Project -->|EventKit| C
-    Ingest --> DB
-    Decide --> DB
-    Project --> Audit
-    Execute --> Audit
+    IOS --> Voice --> LocalVoice --> Confirm -->|user GitHub identity| Issue
+    Issue --> Project
+    Issue --> D
+    Comment --> D
+    D --> Route --> Codex
+    Codex --> Comment
+    Codex --> PR
+    PR --> Issue
+    D --> Project
+    D --> DB
+    D --> Audit
+    D --> Reports
+    D -->|EventKit when needed| R
+    D -->|EventKit when needed| C
+    CLI --> D
+    Launchd --> D
     Audit --> Reports
     Feedback --> Reports
 ```
@@ -93,7 +94,8 @@ bin/smart-shadow eventkit-request-access all
 
 ## Current Verified Slice
 
-- SwiftPM executable: `smart-shadow-mac-core`
+- iOS app target `SmartShadowIOS` for voice-first task entry and GitHub-backed delivery work.
+- SwiftPM executable: `shadowd`
 - Optional SwiftUI menu-bar executable: `smart-shadow-menu`
 - User-level launchd service support
 - JSON event inbox processing
@@ -139,9 +141,20 @@ script/build_and_run.sh --verify
 
 `lark_calendar_events` and `lark_tasks` use the local `lark-cli` in user identity mode. These sensing sources are read-only on the Lark side: calendar events are projected to Apple Calendar, while tasks are projected to Apple Reminders only. Mail decisions never create Lark tasks; work mail is projected to the Apple Reminders `WORK` list and any scheduled time block goes to Apple Calendar through EventKit.
 
-## Menu Bar Status Panel
+## macOS Companion Voice Entry
 
-`smart-shadow-menu` is a SwiftUI menu-bar control panel for the local daemon. It does not replace the `me.longbiaochen.smart-shadow` LaunchAgent and does not write directly to Calendar, Reminders, source configs, or app databases. The panel reads `service-status` and `health`, then offers only safe controls: refresh, start, stop, report, open project, and open logs.
+`smart-shadow-companion-mac` is a temporary SwiftUI menu-bar voice entry for
+Smart Shadow development and local testing. The PRD product entry is the iPhone
+app; the macOS companion only exercises the same voice-task intake contract while
+the iOS flow is being hardened.
+
+The companion is not the product surface and it is not the execution engine. It
+may record short-lived local audio while the user is speaking, but the canonical
+contract is local voice processing first: reuse or abstract ChatType runtime
+capabilities for transcription and polish, show the final text to the user, then
+create or update a GitHub issue/comment with the user's own GitHub identity.
+Raw audio must not be uploaded to GitHub, handed to `shadowd`, or sent through a
+cloud relay.
 
 Run it with:
 
@@ -149,20 +162,46 @@ Run it with:
 ./script/build_and_run.sh
 ```
 
-The script builds `smart-shadow-menu`, stages `dist/SmartShadowMenu.app`, and launches it as an `LSUIElement` menu-bar app without a Dock icon.
+The script builds `smart-shadow-companion-mac`, stages
+`dist/SmartShadowCompanion.app`, and launches it as an `LSUIElement` menu-bar
+app without a Dock icon. Set `SMART_SHADOW_GITHUB_CLIENT_ID` before launching if
+the OAuth client id is not already saved in app settings.
 
-## shadowd Life OS Project Reconciler
+## Menu Bar Status Panel
 
-`shadowd` is the Swift-native local reconciler for the Life OS GitHub Project. It runs on the SOL MacBook, treats GitHub Issue / Project / PR state as the durable source of truth, and does not maintain a separate task database. Local files are limited to logs, dry-run reports, audit JSONL, and non-authoritative runtime evidence.
+`smart-shadow-menu` is a SwiftUI menu-bar control panel for the local daemon. It does not replace the `me.longbiaochen.smart-shadow` LaunchAgent and does not write directly to Calendar, Reminders, source configs, or app databases. The panel reads `service-status` and `health`, then offers only safe controls: refresh, start, stop, report, open project, and open logs.
+
+Run it with:
+
+```sh
+swift run smart-shadow-menu
+```
+
+The companion run script is now the default local app launcher; use SwiftPM
+directly for the older status panel while it remains in the package.
+
+## shadowd GitHub Task Loop
+
+`shadowd` is the Swift-native local service behind the Smart Shadow MVP. It runs
+on the SOL MacBook, treats GitHub Issue / Project / PR state as the durable
+source of truth, assigns work to local Codex agents, and writes progress back as
+Issue comments. It does not maintain a separate authoritative task database.
+Local files are limited to logs, dry-run reports, audit JSONL, caches, and other
+non-authoritative runtime evidence.
 
 Terminology:
 
-- `life-os`: GitHub repo and GitHub Project dashboard.
 - `smart-shadow`: iPhone app, Codex project, and skill name.
-- `shadowd`: Swift-native GitHub Project reconciler on SOL.
-- `chat-type-cli`: local ASR and AI polish CLI.
+- `shadow`: unified external agent identity.
+- `shadowd`: Swift-native local service on SOL.
+- `life-os`: GitHub repo and GitHub Project dashboard used by the current MVP loop.
+- `ChatType Runtime/Polish`: local ASR and text polish capability used before GitHub submission.
 
-The reconciler can inspect the whole Life OS Project without requiring the `smartshadow` label. Voice issues are only one issue class inside the board.
+The current implementation can inspect the whole Life OS Project without
+requiring the `smartshadow` label. The PRD target is broader: voice input becomes
+a structured task, the app asks for confirmation, GitHub Issue / Comment / PR
+becomes the traceable record, and the app shows task status from Draft through
+Done or Failed.
 
 ```mermaid
 flowchart LR
@@ -184,8 +223,8 @@ bin/shadowd once --dry-run
 Expected behavior:
 
 - `shadowd once` reads open issues from the Life OS GitHub Project.
-- Voice issues are detected from compact Smart Shadow metadata or the `voice` label; ready voice issues no-op.
-- Ordinary issues are not sent through transcription.
+- Smart Shadow-created issues/comments contain final user-confirmed text, not audio packets or raw transcript dumps.
+- `shadowd` never runs ASR/transcription and never reads raw audio from GitHub.
 - If an issue's custom status is `完成` while Project Status is not done, `shadowd` plans a Project Status alignment.
 - If an ordinary issue is missing the required task template, `shadowd` plans a clarification comment instead of starting work.
 - Re-running `shadowd once` does not duplicate comments for no-op issues.
@@ -211,9 +250,17 @@ The LaunchAgent label is `me.longbiaochen.shadowd`. It runs [bin/shadowd](bin/sh
 
 State behavior is documented in [docs/state-machine.md](docs/state-machine.md). GitHub token scopes are documented in [docs/github-permissions.md](docs/github-permissions.md).
 
+## GitHub Issue Workflow
+
+`smart-shadow` can accept GitHub issues as local Codex tasks through `shadowd`. The external GitHub agent identity is `shadow`: assign an issue to `shadow`, or comment `@shadow` to trigger the workflow.
+
+The Swift `shadowd` implementation normalizes the issue into an internal task, creates a `shadow/issue-<number>-<slug>` branch in the configured local repository, runs `codex exec`, runs the configured tests, creates a PR titled `[shadow] <issue title>`, and comments progress back to the issue.
+
+See [docs/github-issue-workflow.md](docs/github-issue-workflow.md) for webhook events, repo mapping, environment variables, safety limits, and local test commands. The project name remains `smart-shadow`; the GitHub agent is `shadow`; the local daemon is `shadowd`.
+
 ## Legacy Feishu Bridge
 
-The older TypeScript Feishu-to-Codex bridge remains in the repository as a transition path, but `bin/shadowd` no longer starts it. `shadowd run` is reserved for the Swift-native GitHub Project reconciler.
+The older TypeScript Feishu-to-Codex bridge remains in the repository as a transition path, but `bin/shadowd` no longer starts it and it no longer owns GitHub issue execution. `shadowd run` and `shadowd github-issue` are Swift-native paths.
 
 The legacy bridge does not replace the Swift-native macOS core and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
 

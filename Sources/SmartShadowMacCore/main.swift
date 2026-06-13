@@ -4,6 +4,7 @@ import Foundation
 import CryptoKit
 import Security
 import SQLite3
+import SmartShadowShared
 
 let launchdLabel = "me.longbiaochen.smart-shadow"
 let launchdTarget = "\(NSHomeDirectory())/Library/LaunchAgents/\(launchdLabel).plist"
@@ -231,12 +232,12 @@ final class ReminderFetchResult: @unchecked Sendable {
 }
 
 @main
-struct SmartShadowMacCore {
+struct ShadowD {
     static func main() {
         do {
             try run(Array(CommandLine.arguments.dropFirst()))
         } catch {
-            fputs("smart-shadow: \(error)\n", stderr)
+            fputs("shadowd: \(error)\n", stderr)
             exit(1)
         }
     }
@@ -307,6 +308,10 @@ func run(_ originalArguments: [String]) throws {
         let dryRun = rest.contains("--dry-run")
         let noReminders = rest.contains("--no-reminders")
         printJSON(try projectMailDecision(config, inputPath: input, dryRun: dryRun, noReminders: noReminders))
+    case "once", "run", "github-issue", "inspect-issue":
+        let config = try loadConfig(configPath)
+        try ensureRuntime(config)
+        printJSON(try handleShadowDCommand(config, arguments: arguments))
     case "shadowd":
         let config = try loadConfig(configPath)
         try ensureRuntime(config)
@@ -455,7 +460,8 @@ func printUsage() {
     smart-shadow [--config PATH] rules
     smart-shadow [--config PATH] validate-rules
     smart-shadow [--config PATH] project-mail-decision --input PATH [--dry-run] [--no-reminders]
-    smart-shadow [--config PATH] shadowd once|run|inspect-issue [--dry-run] [--fixture PATH]
+    shadowd [--config PATH] once|run|inspect-issue [--dry-run] [--fixture PATH]
+    shadowd [--config PATH] github-issue --payload PATH --event issues|issue_comment [--dry-run] [--write]
     smart-shadow [--config PATH] sample-event [--sample PATH]
     smart-shadow [--config PATH] google-auth login|status|logout
     smart-shadow eventkit-status
@@ -3809,6 +3815,31 @@ struct ShadowDProjectIssue {
     let labels: [String]
 }
 
+struct ShadowDGitHubRepoConfig {
+    let localPath: String
+    let defaultBase: String
+    let allowedSenders: [String]
+    let testCommand: String?
+    let codexSandbox: String
+}
+
+struct ShadowDGitHubIssueTask {
+    let agentName: String
+    let daemonName: String
+    let trigger: String
+    let repoFullName: String
+    let owner: String
+    let repo: String
+    let issueNumber: Int
+    let issueTitle: String
+    let issueBody: String
+    let issueURL: String
+    let sender: String
+    let command: String?
+    let labels: [String]
+    let assignees: [String]
+}
+
 func handleShadowDCommand(_ config: AppConfig, arguments: [String]) throws -> [String: Any] {
     let subcommand = arguments.first ?? "once"
     let rest = Array(arguments.dropFirst())
@@ -3828,6 +3859,8 @@ func handleShadowDCommand(_ config: AppConfig, arguments: [String]) throws -> [S
             }
             sleep(config.pollSeconds)
         }
+    case "github-issue":
+        return try shadowDHandleGitHubIssue(config: config, arguments: rest, dryRun: dryRun || !rest.contains("--write"))
     case "inspect-issue":
         return try shadowDInspectIssue(config: config, arguments: rest)
     default:
@@ -3887,15 +3920,48 @@ func shadowDReconcile(issue: ShadowDProjectIssue, dryRun: Bool) throws -> [Strin
     if issue.state.lowercased() != "open" {
         return try shadowDResult(issue: issue, action: "no_op", reason: "issue_not_open", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
     }
+    if let smartShadowIssue = SmartShadowIssueParser.parse(SmartShadowIssueEnvelope(title: issue.title, labels: issue.labels, body: issue.body)) {
+        if !smartShadowIssue.isFinalTextTask {
+            let comment = """
+            Smart Shadow no longer processes raw audio in shadowd.
+
+            Please replace this legacy voice packet with the final user-confirmed task text first. Keep the task description at the top, remove audio paths and raw transcript dumps, and keep only compact Smart Shadow metadata.
+            """
+            return try shadowDResult(issue: issue, action: "comment_question", reason: "legacy_voice_audio_needs_final_text", dryRun: dryRun, command: shadowDCommentCommand(issue: issue, body: comment), comment: comment, extra: ["issue": summary])
+        }
+
+        let transition = IssueStateMachine.transition(
+            labels: issue.labels,
+            to: .triaging,
+            comment: "已接收任务，正在拆解。"
+        )
+        return try shadowDResult(
+            issue: issue,
+            action: "transition_issue_state",
+            reason: "smart_shadow_text_issue_ready_for_triage",
+            dryRun: dryRun,
+            command: nil,
+            comment: transition.comment,
+            extra: [
+                "issue": summary,
+                "from_label": transition.from?.rawValue ?? NSNull(),
+                "to_label": transition.to.rawValue,
+                "labels": transition.labels,
+                "input": smartShadowIssue.input ?? NSNull(),
+                "audio": smartShadowIssue.audio ?? NSNull()
+            ]
+        )
+    }
     if shadowDIsVoiceIssue(issue) {
-        if shadowDIsDoneish(issue.projectStatus) || issue.labels.contains(where: { shadowDNormalizeStatus($0).contains("ready") }) {
-            return try shadowDResult(issue: issue, action: "no_op", reason: "voice_issue_already_ready", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+        if shadowDHasLegacyVoicePayload(issue.body) {
+            let comment = """
+            Smart Shadow no longer processes raw audio in shadowd.
+
+            Please replace this legacy voice packet with the final user-confirmed task text first. Keep the task description at the top, remove audio paths and raw transcript dumps, and keep only compact Smart Shadow metadata.
+            """
+            return try shadowDResult(issue: issue, action: "comment_question", reason: "legacy_voice_audio_needs_final_text", dryRun: dryRun, command: shadowDCommentCommand(issue: issue, body: comment), comment: comment, extra: ["issue": summary])
         }
-        if shadowDHasRawTranscript(issue.body) {
-            let comment = "ShadowD detected a legacy voice issue body. Please rewrite it with the final task description first, omit the raw transcript, and keep metadata compact/folded."
-            return try shadowDResult(issue: issue, action: "comment_question", reason: "legacy_voice_body_needs_compaction", dryRun: dryRun, command: shadowDCommentCommand(issue: issue, body: comment), comment: comment, extra: ["issue": summary])
-        }
-        return try shadowDResult(issue: issue, action: "no_op", reason: "voice_issue_waiting_for_transcription_state", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
+        return try shadowDResult(issue: issue, action: "no_op", reason: "smart_shadow_text_issue_ready", dryRun: dryRun, command: nil, comment: nil, extra: ["issue": summary])
     }
     if shadowDIsDoneish(issue.customStatus), !shadowDIsDoneish(issue.projectStatus) {
         let intent = shadowDProjectStatusCommand(issue: issue, status: "Done")
@@ -3952,6 +4018,14 @@ func shadowDIsVoiceIssue(_ issue: ShadowDProjectIssue) -> Bool {
 
 func shadowDHasRawTranscript(_ body: String) -> Bool {
     body.range(of: "Raw Transcript", options: [.caseInsensitive]) != nil
+}
+
+func shadowDHasLegacyVoicePayload(_ body: String) -> Bool {
+    let lowercased = body.lowercased()
+    return lowercased.contains("\"audio_path\"")
+        || lowercased.contains("audio_file")
+        || lowercased.contains(".m4a")
+        || lowercased.contains("raw transcript")
 }
 
 func shadowDHasIssueTemplateEssentials(_ body: String) -> Bool {
@@ -4144,6 +4218,353 @@ func shadowDProjectStatusField(_ project: [String: Any]) -> (fieldID: String?, d
         return (field["id"] as? String, done?["id"] as? String)
     }
     return (nil, nil)
+}
+
+func shadowDHandleGitHubIssue(config: AppConfig, arguments: [String], dryRun: Bool) throws -> [String: Any] {
+    let payloadPath = try requiredOption(arguments, "--payload")
+    let eventName = optionValue(arguments, "--event") ?? "issues"
+    let deliveryID = optionValue(arguments, "--delivery") ?? "local-\(Int(Date().timeIntervalSince1970))"
+    let data = try Data(contentsOf: URL(fileURLWithPath: payloadPath))
+    guard let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw AppError.runtime("GitHub issue payload must be a JSON object.")
+    }
+    let route = try shadowDNormalizeGitHubIssuePayload(config: config, eventName: eventName, deliveryID: deliveryID, payload: payload)
+    guard route.allowed, let task = route.task else {
+        return [
+            "status": "ignored",
+            "mode": "github_issue_workflow",
+            "reason": route.reason,
+            "delivery_id": deliveryID
+        ] as [String: Any]
+    }
+    let result = try shadowDRunGitHubIssueWorkflow(config: config, task: task, dryRun: dryRun)
+    try appendAudit(config, [
+        "type": "shadowd_github_issue",
+        "dry_run": dryRun,
+        "repo": task.repoFullName,
+        "issue": task.issueNumber,
+        "trigger": task.trigger,
+        "status": result["status"] as? String ?? "unknown"
+    ])
+    return result
+}
+
+func shadowDNormalizeGitHubIssuePayload(config: AppConfig, eventName: String, deliveryID: String, payload: [String: Any]) throws -> (allowed: Bool, reason: String, task: ShadowDGitHubIssueTask?) {
+    let github = config.raw["github"] as? [String: Any] ?? [:]
+    let enabled = github["enabled"] as? Bool ?? false
+    guard enabled else { return (false, "github_disabled", nil) }
+    let allowedEvents = github["events"] as? [String] ?? ["issues", "issue_comment"]
+    guard allowedEvents.contains(eventName) else { return (false, "event_not_allowed", nil) }
+    guard
+        let repository = payload["repository"] as? [String: Any],
+        let repoFullName = repository["full_name"] as? String
+    else { return (false, "repository_missing", nil) }
+    guard let repoConfig = shadowDGitHubRepoConfig(config: config, repoFullName: repoFullName) else {
+        return (false, "repository_mapping_missing", nil)
+    }
+    let action = payload["action"] as? String ?? ""
+    let sender = ((payload["sender"] as? [String: Any])?["login"] as? String) ?? "unknown"
+    if !repoConfig.allowedSenders.isEmpty, !repoConfig.allowedSenders.contains(sender) {
+        return (false, "sender_not_allowed", nil)
+    }
+    guard let issue = payload["issue"] as? [String: Any] else {
+        return (false, "issue_missing", nil)
+    }
+    guard (issue["pull_request"] as? [String: Any]) == nil else {
+        return (false, "github_item_not_issue", nil)
+    }
+    guard let issueNumber = issue["number"] as? Int else {
+        return (false, "issue_number_missing", nil)
+    }
+    let assignee = ((payload["assignee"] as? [String: Any])?["login"] as? String)
+    let assignees = shadowDGitHubLogins(issue["assignees"])
+    let command = shadowDGitHubCommentCommand((payload["comment"] as? [String: Any])?["body"] as? String)
+    let configuredAssignee = github["assignee"] as? String ?? "shadow"
+    let allowedCommands = github["allowedCommentCommands"] as? [String] ?? ["@shadow", "@shadow fix", "@shadow continue", "@shadow test", "@shadow explain"]
+    let trigger: String
+    if eventName == "issues", action == "assigned" {
+        let actual = assignee ?? assignees.last
+        guard actual?.lowercased() == configuredAssignee.lowercased() else {
+            return (false, "assignee_not_shadow", nil)
+        }
+        trigger = "assigned"
+    } else if eventName == "issue_comment", action == "created" {
+        guard let command else { return (false, "comment_command_not_matched", nil) }
+        guard allowedCommands.contains(command) else { return (false, "comment_command_not_allowed", nil) }
+        trigger = "comment"
+    } else {
+        return (false, "trigger_not_matched", nil)
+    }
+    let parts = repoFullName.split(separator: "/", maxSplits: 1).map(String.init)
+    let task = ShadowDGitHubIssueTask(
+        agentName: github["agentName"] as? String ?? "shadow",
+        daemonName: github["daemonName"] as? String ?? "shadowd",
+        trigger: trigger,
+        repoFullName: repoFullName,
+        owner: parts.first ?? "unknown",
+        repo: parts.count > 1 ? parts[1] : "unknown",
+        issueNumber: issueNumber,
+        issueTitle: issue["title"] as? String ?? "Issue #\(issueNumber)",
+        issueBody: issue["body"] as? String ?? "",
+        issueURL: issue["html_url"] as? String ?? "https://github.com/\(repoFullName)/issues/\(issueNumber)",
+        sender: sender,
+        command: command,
+        labels: shadowDGitHubLabelNames(issue["labels"]),
+        assignees: assignees
+    )
+    _ = deliveryID
+    return (true, "matched", task)
+}
+
+func shadowDGitHubRepoConfig(config: AppConfig, repoFullName: String) -> ShadowDGitHubRepoConfig? {
+    let github = config.raw["github"] as? [String: Any] ?? [:]
+    let repos = github["repos"] as? [String: Any] ?? [:]
+    guard let repo = repos[repoFullName] as? [String: Any] else { return nil }
+    return ShadowDGitHubRepoConfig(
+        localPath: absolutePath(repo["localPath"] as? String ?? repo["local_path"] as? String ?? config.projectRoot, base: config.projectRoot),
+        defaultBase: repo["defaultBase"] as? String ?? repo["default_base"] as? String ?? "main",
+        allowedSenders: repo["allowedSenders"] as? [String] ?? repo["allowed_senders"] as? [String] ?? [],
+        testCommand: repo["testCommand"] as? String ?? repo["test_command"] as? String,
+        codexSandbox: repo["codexSandbox"] as? String ?? repo["codex_sandbox"] as? String ?? "workspace-write"
+    )
+}
+
+func shadowDRunGitHubIssueWorkflow(config: AppConfig, task: ShadowDGitHubIssueTask, dryRun: Bool) throws -> [String: Any] {
+    guard let repoConfig = shadowDGitHubRepoConfig(config: config, repoFullName: task.repoFullName) else {
+        throw AppError.runtime("No GitHub repo mapping configured for \(task.repoFullName).")
+    }
+    let branch = shadowDBranchName(issueNumber: task.issueNumber, title: task.issueTitle)
+    let lockPath = shadowDLockPath(config: config, task: task)
+    let logLines = NSMutableArray()
+    if FileManager.default.fileExists(atPath: lockPath) {
+        return [
+            "status": "locked",
+            "mode": "github_issue_workflow",
+            "repo": task.repoFullName,
+            "issue": task.issueNumber,
+            "branch": branch,
+            "reason": "task_already_running"
+        ] as [String: Any]
+    }
+    try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: lockPath).deletingLastPathComponent().path, withIntermediateDirectories: true)
+    try "running \(nowISO())\n".write(toFile: lockPath, atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(atPath: lockPath) }
+    do {
+        try shadowDGitHubComment(task: task, body: shadowDStatusAccepted(task), dryRun: dryRun)
+        try shadowDGitHubComment(task: task, body: shadowDStatusRunning(task, branch: branch), dryRun: dryRun)
+        try shadowDRunChecked(["git", "fetch", "origin"], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        try shadowDRunChecked(["git", "checkout", repoConfig.defaultBase], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        try shadowDRunChecked(["git", "pull", "--ff-only", "origin", repoConfig.defaultBase], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        try shadowDRunChecked(["git", "checkout", "-B", branch], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        let comments = try shadowDFetchIssueComments(task: task, cwd: repoConfig.localPath, dryRun: dryRun)
+        let prompt = shadowDGitHubPrompt(task: task, comments: comments)
+        let codex = try shadowDRunCommand(["codex", "exec", "--sandbox", repoConfig.codexSandbox, prompt], cwd: repoConfig.localPath, dryRun: dryRun, timeoutSeconds: 900)
+        logLines.add("codex exit=\(codex.status)\n\(codex.output)")
+        if codex.status != 0 { throw AppError.runtime("codex exec failed: \(shadowDSummarize(codex.output, maxLength: 600))") }
+        var tests = "not configured"
+        if let testCommand = repoConfig.testCommand, !testCommand.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let argv = shadowDSplitTrustedCommand(testCommand)
+            let test = try shadowDRunCommand(argv, cwd: repoConfig.localPath, dryRun: dryRun, timeoutSeconds: 900)
+            logLines.add("tests exit=\(test.status)\n\(test.output)")
+            tests = test.status == 0 ? "passed: \(testCommand)" : "failed: \(testCommand)\n\(shadowDSummarize(test.output, maxLength: 600))"
+            if test.status != 0 { throw AppError.runtime(tests) }
+        }
+        let status = try shadowDRunCommand(["git", "status", "--porcelain"], cwd: repoConfig.localPath, dryRun: dryRun, timeoutSeconds: 30)
+        logLines.add("git status\n\(status.output)")
+        let summary = shadowDSummarize(codex.output.isEmpty ? "shadow completed the requested issue workflow." : codex.output)
+        if status.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let logPath = try shadowDWriteIssueLog(config: config, task: task, lines: logLines)
+            try shadowDGitHubComment(task: task, body: shadowDStatusNoChanges(task, summary: summary), dryRun: dryRun)
+            return ["status": "no_changes", "mode": "github_issue_workflow", "repo": task.repoFullName, "issue": task.issueNumber, "branch": branch, "log_path": logPath] as [String: Any]
+        }
+        try shadowDRunChecked(["git", "add", "-A"], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        try shadowDRunChecked(["git", "commit", "-m", "Fix issue #\(task.issueNumber) via shadow"], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        try shadowDRunChecked(["git", "push", "-u", "origin", branch], cwd: repoConfig.localPath, dryRun: dryRun, logLines: logLines)
+        let prBody = shadowDPRBody(task: task, summary: summary, tests: tests)
+        let pr = try shadowDRunCommand(["gh", "pr", "create", "--repo", task.repoFullName, "--base", repoConfig.defaultBase, "--head", branch, "--title", "[shadow] \(task.issueTitle)", "--body", prBody], cwd: repoConfig.localPath, dryRun: dryRun, timeoutSeconds: 120)
+        logLines.add("pr\n\(pr.output)")
+        let prURL = shadowDExtractURL(pr.output) ?? "(dry-run PR URL unavailable)"
+        let logPath = try shadowDWriteIssueLog(config: config, task: task, lines: logLines)
+        try shadowDGitHubComment(task: task, body: shadowDStatusPR(task, prURL: prURL, summary: summary, tests: tests), dryRun: dryRun)
+        return ["status": "pr_created", "mode": "github_issue_workflow", "repo": task.repoFullName, "issue": task.issueNumber, "branch": branch, "pr_url": prURL, "log_path": logPath] as [String: Any]
+    } catch {
+        let logPath = try? shadowDWriteIssueLog(config: config, task: task, lines: logLines)
+        try? shadowDGitHubComment(task: task, body: shadowDStatusFailed(task, branch: branch, error: "\(error)"), dryRun: dryRun)
+        throw AppError.runtime("GitHub issue workflow failed: \(error). log=\(logPath ?? "(none)")")
+    }
+}
+
+func shadowDGitHubLabelNames(_ value: Any?) -> [String] {
+    (value as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+}
+
+func shadowDGitHubLogins(_ value: Any?) -> [String] {
+    (value as? [[String: Any]] ?? []).compactMap { $0["login"] as? String }
+}
+
+func shadowDGitHubCommentCommand(_ body: String?) -> String? {
+    let first = (body ?? "").trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? ""
+    let pattern = #"^@shadow(?:\s+(fix|continue|test|explain))?(?:\s|$)"#
+    guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+    let range = NSRange(first.startIndex..<first.endIndex, in: first)
+    guard let match = regex.firstMatch(in: first, range: range) else { return nil }
+    if match.numberOfRanges > 1, let subrange = Range(match.range(at: 1), in: first) {
+        return "@shadow \(first[subrange].lowercased())"
+    }
+    return "@shadow"
+}
+
+func shadowDBranchName(issueNumber: Int, title: String) -> String {
+    let slug = title.lowercased()
+        .replacingOccurrences(of: #"[^a-z0-9]+"#, with: "-", options: .regularExpression)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    let limited = String(slug.prefix(60)).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    return "shadow/issue-\(issueNumber)-\(limited.isEmpty ? "issue" : limited)"
+}
+
+func shadowDLockPath(config: AppConfig, task: ShadowDGitHubIssueTask) -> String {
+    let safe = "\(task.repoFullName)-\(task.issueNumber)".replacingOccurrences(of: #"[^A-Za-z0-9_.-]+"#, with: "-", options: .regularExpression)
+    return "\(config.runtimeRoot)/locks/github-\(safe).lock"
+}
+
+func shadowDFetchIssueComments(task: ShadowDGitHubIssueTask, cwd: String, dryRun: Bool) throws -> String {
+    if dryRun { return "(dry-run: comments not fetched)" }
+    let result = try shadowDRunCommand(["gh", "api", "/repos/\(task.repoFullName)/issues/\(task.issueNumber)/comments", "--jq", ".[-8:] | map(.user.login + \": \" + .body) | .[]"], cwd: cwd, dryRun: false, timeoutSeconds: 60)
+    return result.status == 0 ? result.output : ""
+}
+
+func shadowDRunChecked(_ argv: [String], cwd: String, dryRun: Bool, logLines: NSMutableArray) throws {
+    let result = try shadowDRunCommand(argv, cwd: cwd, dryRun: dryRun, timeoutSeconds: 120)
+    logLines.add("$ \(argv.joined(separator: " "))\nexit=\(result.status)\n\(result.output)")
+    if result.status != 0 {
+        throw AppError.runtime("\(argv.joined(separator: " ")) failed: \(shadowDSummarize(result.output, maxLength: 600))")
+    }
+}
+
+func shadowDRunCommand(_ argv: [String], cwd: String, dryRun: Bool, timeoutSeconds: TimeInterval) throws -> (status: Int32, output: String) {
+    if dryRun {
+        if argv.first == "git", argv.dropFirst().joined(separator: " ") == "status --porcelain" {
+            return (0, "")
+        }
+        return (0, "[dry-run] \(argv.joined(separator: " "))")
+    }
+    let previous = FileManager.default.currentDirectoryPath
+    FileManager.default.changeCurrentDirectoryPath(cwd)
+    defer { FileManager.default.changeCurrentDirectoryPath(previous) }
+    return try shellResult(argv, timeoutSeconds: timeoutSeconds)
+}
+
+func shadowDGitHubComment(task: ShadowDGitHubIssueTask, body: String, dryRun: Bool) throws {
+    let argv = ["gh", "issue", "comment", "\(task.issueNumber)", "--repo", task.repoFullName, "--body", body]
+    if dryRun { return }
+    let result = try shellResult(argv, timeoutSeconds: 60)
+    if result.status != 0 { throw AppError.runtime("GitHub comment failed: \(result.output)") }
+}
+
+func shadowDWriteIssueLog(config: AppConfig, task: ShadowDGitHubIssueTask, lines: NSMutableArray) throws -> String {
+    let dir = "\(config.runtimeRoot)/logs/github-issue-workflow"
+    try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let safe = "\(task.repoFullName)-\(task.issueNumber)".replacingOccurrences(of: #"[^A-Za-z0-9_.-]+"#, with: "-", options: .regularExpression)
+    let path = "\(dir)/\(Int(Date().timeIntervalSince1970))-\(safe).log"
+    let text = lines.compactMap { $0 as? String }.joined(separator: "\n\n")
+    try text.write(toFile: path, atomically: true, encoding: .utf8)
+    return path
+}
+
+func shadowDGitHubPrompt(task: ShadowDGitHubIssueTask, comments: String) -> String {
+    [
+        "You are shadow, a local Codex agent executed by shadowd inside the existing smart-shadow system.",
+        "",
+        "Repository: \(task.repoFullName)",
+        "Issue: #\(task.issueNumber) \(task.issueTitle)",
+        "Issue URL: \(task.issueURL)",
+        "",
+        "Issue body:",
+        task.issueBody.isEmpty ? "(empty)" : task.issueBody,
+        "",
+        "Relevant comments:",
+        comments.isEmpty ? "(none)" : comments,
+        "",
+        "Labels: \(task.labels.isEmpty ? "(none)" : task.labels.joined(separator: ", "))",
+        "",
+        "Instructions:",
+        "1. Understand the issue.",
+        "2. Make the smallest safe code change.",
+        "3. Preserve the existing architecture.",
+        "4. Do not rewrite unrelated files.",
+        "5. Do not expose secrets.",
+        "6. Do not run destructive commands.",
+        "7. Run the configured test command if available.",
+        "8. If ambiguous, make a conservative best effort and document assumptions.",
+        "9. Do not merge.",
+        "10. Leave the repository in a clean state.",
+        "",
+        "Output requirements:",
+        "- Summary",
+        "- Files changed",
+        "- Tests run",
+        "- Risks or follow-up"
+    ].joined(separator: "\n")
+}
+
+func shadowDStatusAccepted(_ task: ShadowDGitHubIssueTask) -> String {
+    "👤 `\(task.agentName)` 已接单。\n\n- Trigger: \(task.trigger)\n- Repo: `\(task.repoFullName)`\n- Issue: #\(task.issueNumber)\n- Status: queued"
+}
+
+func shadowDStatusRunning(_ task: ShadowDGitHubIssueTask, branch: String) -> String {
+    "👤 `\(task.agentName)` 开始执行。\n\n- Service: `\(task.daemonName)`\n- Branch: `\(branch)`\n- Runtime: local Codex\n- Status: running"
+}
+
+func shadowDStatusPR(_ task: ShadowDGitHubIssueTask, prURL: String, summary: String, tests: String) -> String {
+    "✅ `\(task.agentName)` 已创建 PR：\n\n\(prURL)\n\n摘要：\(summary)\n\n测试：\(tests)\n\n请在 PR 中 review；如需继续修改，可以评论：\n\n@shadow continue"
+}
+
+func shadowDStatusNoChanges(_ task: ShadowDGitHubIssueTask, summary: String) -> String {
+    "ℹ️ `\(task.agentName)` 已执行，但没有产生代码变更。\n\n摘要：\(summary)\n\n可能原因：\n- Issue 已经被修复\n- 任务描述不够明确\n- Codex 判断不需要修改"
+}
+
+func shadowDStatusFailed(_ task: ShadowDGitHubIssueTask, branch: String, error: String) -> String {
+    "❌ `\(task.agentName)` 执行失败。\n\n- Service: `\(task.daemonName)`\n- Trigger: \(task.trigger)\n- Branch: `\(branch)`\n- Error summary: \(shadowDSummarize(error, maxLength: 500))\n\n请查看本地 `shadowd` 日志。"
+}
+
+func shadowDPRBody(task: ShadowDGitHubIssueTask, summary: String, tests: String) -> String {
+    "## Summary\n\nGenerated by `shadow`, executed by local `shadowd` inside `smart-shadow`.\n\n## Linked issue\n\nCloses #\(task.issueNumber)\n\n## Changes\n\n\(summary)\n\n## Tests\n\n\(tests)\n\n## Notes\n\nThis PR was generated locally and requires human review before merge."
+}
+
+func shadowDSummarize(_ output: String, maxLength: Int = 1200) -> String {
+    let normalized = output.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+    if normalized.count <= maxLength { return normalized }
+    return "\(normalized.prefix(maxLength - 1))..."
+}
+
+func shadowDExtractURL(_ output: String) -> String? {
+    output.split(whereSeparator: { $0.isWhitespace }).map(String.init).first { $0.hasPrefix("http://") || $0.hasPrefix("https://") }
+}
+
+func shadowDSplitTrustedCommand(_ command: String) -> [String] {
+    var result: [String] = []
+    var current = ""
+    var quote: Character?
+    for char in command {
+        if let active = quote {
+            if char == active {
+                quote = nil
+            } else {
+                current.append(char)
+            }
+        } else if char == "\"" || char == "'" {
+            quote = char
+        } else if char.isWhitespace {
+            if !current.isEmpty {
+                result.append(current)
+                current = ""
+            }
+        } else {
+            current.append(char)
+        }
+    }
+    if !current.isEmpty { result.append(current) }
+    return result
 }
 
 func requiredOption(_ args: [String], _ option: String) throws -> String {

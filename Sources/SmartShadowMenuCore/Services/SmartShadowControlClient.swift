@@ -23,7 +23,7 @@ public struct CommandExecutionError: Error, CustomStringConvertible, Sendable {
 public struct SmartShadowControlClient: Sendable {
     public let projectRoot: String
 
-    public init(projectRoot: String = ProcessInfo.processInfo.environment["SMART_SHADOW_PROJECT_ROOT"] ?? FileManager.default.currentDirectoryPath) {
+    public init(projectRoot: String = SmartShadowControlClient.defaultProjectRoot()) {
         self.projectRoot = projectRoot
     }
 
@@ -86,5 +86,20 @@ public struct SmartShadowControlClient: Sendable {
         let output = String(data: data, encoding: .utf8) ?? ""
         let command = ([executable] + arguments).joined(separator: " ")
         throw CommandExecutionError(command: command, status: process.terminationStatus, output: output)
+    }
+
+    public static func defaultProjectRoot() -> String {
+        if let configured = ProcessInfo.processInfo.environment["SMART_SHADOW_PROJECT_ROOT"],
+           !configured.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return configured
+        }
+
+        let bundleURL = Bundle.main.bundleURL
+        if bundleURL.pathExtension == "app",
+           bundleURL.deletingLastPathComponent().lastPathComponent == "dist" {
+            return bundleURL.deletingLastPathComponent().deletingLastPathComponent().path
+        }
+
+        return "/Users/longbiao/Projects/smart-shadow"
     }
 }
