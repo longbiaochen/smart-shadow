@@ -2,11 +2,22 @@
 
 ## 1. 产品定位
 
-Smart Shadow 是一个运行在 iPhone 上的个人任务入口 App。
+Smart Shadow 是一个运行在 iPhone 和本地 Mac 上的智能影子系统。系统需要建立入口层：入口可以是用户在电脑或手机应用中的操作，例如显式的 AI 智能影子、加星、收藏、分享、标记；也可以是电脑上的菜单栏应用入口，或通过快捷键唤起的语音交互入口；也可以是手机上的轻应用，扫码绑定后即可唤起。用户通过语音交互后，最终路由回电脑上的 `shadowd`。`shadowd` 是运行在 Mac 上的系统服务，负责感知、连接、调度、跟踪和反馈；Codex 是决策大脑，负责在主线、Project、Issue / 事项三层哲学下完成任务理解、分解、规划和判断，并在对应项目 Thread 中调用本机软件推进。
 
-它的核心不是聊天，也不是项目管理系统，而是一个“如影随形”的极简任务入口：用户通过一个按钮进行语音输入，App 在本地完成转写与润色，将自然语言规整为清晰任务，并用用户本人的 GitHub 身份写入 Issue / Comment。本地服务 shadowd 只以 Shadow GitHub App bot 身份承接和执行任务、分配给本地 Codex agent、回写进展，并通过 GitHub Issue / PR / Comment 形成可追踪闭环。
+它的核心不是聊天、项目管理系统、全量环境信号自动接管系统或主动社交代理，而是一个“如影随形”的入口层和电脑响应桥梁：用户通过手机轻应用、扫码绑定入口、Mac 菜单栏、快捷键语音、应用内 AI 智能影子、加星、收藏、保存、分享、GitHub `@shadow`、Mail、微信、浏览器或确认建议等明确动作表达意图后，入口层将事件路由回 `shadowd`；`shadowd` 将意图和上下文连接给 Codex；Codex 规整为 Project / Issue，决定执行路径，并在对应项目下创建或恢复 Thread，调用本机软件推进；最后由 `shadowd` 给用户创建反馈，反馈位置默认使用用户发布任务的平台渠道。
+
+从实现形态看，Smart Shadow 是围绕 Codex 和本机系统服务的二次开发，而不是另起炉灶的通用 AI 助手。Codex 承接推理、任务分解、规划、项目 Thread 创建/恢复、本机软件调用、工具选择和解释；`shadowd` 承接显式入口接收、隐式意图监测、来源去重、上下文整理、Codex 连接、状态跟踪、反馈回传、反馈渠道映射和审计；Smart Shadow 通过 Agent 规约、正式文档、skills、本地 `shadowd` 服务、自动化边界和 Apple native app 桥接，把两者组织成能使用电脑软件管理人生主线、Project 和 Issue 的智能影子。
 
 核心原则是：User writes intent. Shadow executes work.
+
+阶段性产品原则是：Smart Shadow 优先跟进用户显式表达出的意图，也可以把授权范围内的本机应用变化作为隐式意图候选，但不替用户接管 Mail、微信、新闻、信息流、联系人、日历或文件系统里的全量环境事件。用户仍然主动面对外部内容和社交关系；隐式意图默认先进入记录、解释、补全、dry-run 或审核流程，不自动产生高风险外部动作。
+
+核心设计抓手是三层哲学和两个运行角色：
+
+1. Codex：决策大脑，承接用户意图、主线判断、Project / Issue 规整、优先级、风险、任务分解、规划、复盘、解释和目标软件选择。
+2. `shadowd`：系统服务和桥梁，承接感知、连接、调度、跟踪、审计、恢复、反馈渠道映射和反馈创建。
+
+四个人生主线是一套设计哲学，不要求全部放在同一个软件里管理。当前默认准则是：工作相关任务使用用户当前的 Feishu 平台，通过 Feishu CLI 使用 Feishu 的任务看板跟踪；生活相关任务使用 Apple Reminders，在 Reminders 的对应看板或列表中跟踪。GitHub 主要承载代码、PR、Issue、CI、开源反馈和 repo-centered execution；Calendar 主要承载时间块和节奏；Finder、Notes、Contacts、Photos、Music 承载对应资料和资产。具体载体仍由 Project 语义、协作场景、隐私风险和用户习惯决定，但偏离默认准则时需要能解释原因并保留 Project / Issue 映射。
 
 ## 2. MVP 产品定义
 
@@ -14,12 +25,12 @@ Smart Shadow 是一个运行在 iPhone 上的个人任务入口 App。
 
 用户可以用最少操作完成：
 
-1. 语音说出一个任务。
-2. App 本地转写、润色、识别意图并规整为结构化任务。
-3. 用户确认后，以用户本人 GitHub 身份创建 issue 或 comment。
-4. shadowd 将任务分配给本地 Codex agent。
-5. 用户在 App 中看到任务进展、阻塞、PR、完成状态。
-6. 任务结果通过 GitHub Issue / PR 形成可追踪记录。
+1. 从入口层表达一个想法/事项：手机轻应用、扫码绑定入口、Mac 菜单栏、快捷键语音、应用内 AI 智能影子、加星收藏、分享标记、Mail、浏览器、ChatGPT、GitHub、微信、Feishu、Finder、Calendar 等。
+2. 入口层将语音和操作事件路由回电脑上的 `shadowd`；`shadowd` 感知显式或隐式意图，整理来源、上下文、去重键和风险线索。
+3. Codex 识别人生主线、Project、Issue、优先级、风险、时间含义和目标软件，并在对应项目下创建或恢复 Thread。
+4. 用户确认或规则允许后，Codex 在该项目 Thread 中调用本机应用、本地 Codex agent 或外部协作面推进事项。
+5. 用户通过手机轻应用、Codex / shadow、本机应用或外部协作面查看状态、补充信息和验收结果。
+6. 最后由 `shadowd` 创建反馈；反馈位置默认使用用户发布任务的平台渠道，同时结果在对应软件中保持 Project / Issue 内部身份和映射，避免重复、断链和不可追踪副本。
 
 ### 2.2 MVP 不做什么
 
@@ -33,6 +44,10 @@ MVP 阶段不做：
 6. 不做复杂自动化工作流编排。
 7. 不做独立代码托管或版本管理系统。
 8. 不做大而全的信息流产品。
+9. 不做全量环境信号自动接管系统。
+10. 不做主动社交代理，不替用户回复、沟通或对外承诺。
+11. 不做 Mail、消息、新闻、日历、联系人或浏览历史的全量事件源筛选。
+12. 不默认开启 daemon sensing，不默认自动归档、删除、回复、转发或向外部系统写入。
 
 ## 3. 用户角色
 
@@ -46,28 +61,30 @@ MVP 阶段不做：
 
 ### 3.3 shadowd
 
-运行在本地设备上的服务，负责接收 GitHub webhook、拉取最终文本任务、分配给 Codex agent、回写进展、创建 branch/commit/PR。shadowd 不负责录音、音频存储、语音转写、用户身份写入或创建用户型 GitHub bot 账号。
+运行在本地设备上的系统服务，是智能影子的感知和响应桥梁，而不是另一个大模型后端。它负责接收显式输入或 webhook、监测授权范围内的隐式意图、来源去重、上下文整理、维护 Project / Issue 映射、连接 Codex 完成任务分解和规划、桥接 Reminders、Calendar、Finder、Notes、Contacts、Photos、Music、Feishu、GitHub、Mail、微信等目标软件或外部接口、记录审计和健康状态、回写进展、必要时创建 branch/commit/PR。shadowd 不负责录音、音频存储、语音转写、用户身份写入或创建用户型 GitHub bot 账号。
+
+技术路径上，shadowd 以 `smart-shadow` 项目作为任务承接和 dispatcher 入口，复用 Codex App 正在使用的 App Server，不启动或引入第二套 App Server。任务被解析后，shadowd 根据 Codex 的路由决策打开、恢复或创建目标项目下的合适 thread；Codex 在该项目 thread 中推进任务并调用本机软件；shadowd 保存 intake thread、目标 project、目标 thread、决策原因和反馈渠道映射。
 
 ### 3.4 Codex agent
 
-具体执行任务的本地代码 agent。用户不需要直接管理多个 Codex agent。
+具体承接用户意图、解释 Smart Shadow 规约、维护主线 / Project / Issue 三层哲学、分解任务、制定计划、选择工具并执行任务的本地 agent。用户不需要直接管理多个 Codex agent；Smart Shadow 的目标是让 Codex 在这些规约下表现为统一的 shadow。
 
 ## 4. Feature List
 
 | Feature ID | Feature 名称 | MVP 是否包含 | 功能定位 |
 |---|---|---:|---|
-| F1 | 单按钮语音入口 | 是 | App 的核心输入方式 |
+| F1 | 入口层 | 是 | 统一承接手机轻应用、扫码绑定、Mac 菜单栏、快捷键语音、应用内 AI 智能影子、加星收藏、分享标记等入口 |
 | F2 | 语音转文字 | 是 | 将用户口述转为文本 |
 | F3 | 意图识别 | 是 | 判断用户输入属于什么类型任务 |
 | F4 | 任务规整 | 是 | 将自然语言整理为结构化任务 |
 | F5 | 用户确认 | 是 | 投递前让用户确认任务内容 |
-| F6 | 项目上下文识别 | 是 | 判断任务关联哪个项目 / repo |
-| F7 | 投递给 shadow | 是 | 将任务发送给统一 agent 身份 |
-| F8 | GitHub Issue 创建 / 更新 | 是 | 作为任务主记录 |
-| F9 | shadowd 本地任务承接 | 是 | 本地服务接收并调度任务 |
-| F10 | Codex agent 分配 | 是 | 将任务交给本地 Codex 执行 |
-| F11 | 执行进展回写 | 是 | 将阶段性进展写回 Issue comment |
-| F12 | PR 创建与关联 | 是 | 代码变更完成后创建 PR |
+| F6 | 项目上下文识别 | 是 | 判断事项关联哪条人生主线和哪个 Project |
+| F7 | 投递给 shadow | 是 | 将用户确认后的 Project / Issue 发送给统一 agent 身份 |
+| F8 | 目标软件响应与同步 | 是 | 将 Project / Issue 更新到 Reminders、Calendar、Finder、Notes、Contacts、Photos、Music、GitHub、Feishu、Mail 等语义合适的软件表面 |
+| F9 | shadowd 系统服务承接 | 是 | 本地服务感知、连接、调度、跟踪、反馈渠道映射和反馈 |
+| F10 | Codex 决策与 agent 执行 | 是 | 将任务交给 Codex 完成分解、规划、项目 Thread 推进和本机软件调用 |
+| F11 | 执行进展回写 | 是 | 将阶段性进展回写到 Project / Issue，并按需要同步到外部协作面 |
+| F12 | 外部协作记录创建与关联 | 是 | 代码变更、团队协作或外部反馈需要时创建 GitHub PR/Issue、Feishu 文档或 Mail 跟进 |
 | F13 | App 任务状态展示 | 是 | 用户查看任务进行到哪一步 |
 | F14 | Push 通知 | 是 | 关键状态变化时提醒用户 |
 | F15 | 信息流刷新 | 是 | 展示近期任务和状态变化 |
@@ -76,14 +93,22 @@ MVP 阶段不做：
 | F18 | 本地目录策略 | 是 | 区分管理型项目与开发型项目 |
 | F19 | GitHub 替代系统 | 否 | MVP 不自建 Issue / PR / CI / Wiki |
 | F20 | 多人协作后台 | 否 | MVP 聚焦个人 shadow 工作流 |
+| F21 | 意图来源适配器 | 是 | 接收入口层事件、用户标记、收藏、保存、分享、确认后的输入或授权范围内的隐式候选 |
 
 ## 5. 功能定义
 
-### F1. 单按钮语音入口
+### F1. 入口层
 
-Smart Shadow 首页只保留一个核心入口按钮。
+Smart Shadow 需要一个统一入口层，而不是只有单一手机按钮。
 
-用户点击或长按按钮后，进入语音输入状态。这个按钮是 App 的主要交互中心，承担“把脑子里的事情交给 shadow”的作用。
+入口可以来自：
+
+1. 用户在电脑或手机应用中的操作，例如显式的 AI 智能影子、加星、收藏、分享、标记、对某个对象说“交给 shadow”。
+2. 电脑上的菜单栏应用入口。
+3. 通过快捷键唤起的语音交互入口。
+4. 手机上扫码绑定后的轻应用入口。
+
+用户通过语音交互后，最终路由回电脑上的 `shadowd`。入口层负责捕捉来源、用户动作、语音/文本、目标对象、应用上下文和反馈渠道；`shadowd` 负责把这些输入连接到 Codex。
 
 ### F2. 语音转文字
 
@@ -160,11 +185,51 @@ MVP 的项目上下文来源包括：
 
 对用户来说，不需要选择具体 Codex agent，也不需要理解本地调度细节。
 
-### F8. GitHub Issue 创建 / 更新
+### F21. 意图来源适配器
 
-开发型任务和需要追踪的任务，应创建或更新 GitHub Issue。
+Smart Shadow 的入口不是所有外部事件，而是用户的明确动作和授权范围内的隐式意图候选。MVP 允许的入口包括：
 
-Issue 是任务主记录。
+| 入口 | 显式动作 | 后续处理 |
+|---|---|---|
+| 语音任务 | 用户通过手机轻应用、Mac 菜单栏或快捷键说出任务 | 本地转写、任务规整、用户确认后路由回 Mac 上的 shadowd |
+| Mac 菜单栏 | 用户从菜单栏唤起 Smart Shadow | 创建本机入口事件，可进入语音、文本或当前上下文任务 |
+| 快捷键语音 | 用户按全局快捷键后说出任务 | 本地语音交互后路由回 Mac 上的 shadowd |
+| 手机轻应用 | 用户扫码绑定后在手机上唤起 | 作为移动入口采集语音/文本/补充说明，最终路由回 Mac 上的 shadowd |
+| 应用内 AI 智能影子 | 用户点击应用内可见的 AI 智能影子入口 | 绑定当前对象和应用上下文，生成显式任务候选 |
+| 加星/收藏/分享/标记 | 用户在电脑或手机应用中执行明确操作 | 作为显式意图入口，提取目标对象和期望动作 |
+| Mail | 用户标记、转发、分享、选择某封邮件，或确认 mail decision | 将邮件 thread 作为外部事项候选，归入某个 Project 并创建/更新 Issue；必要时再投影到 Reminders、Calendar、Finder、Notes、GitHub、Feishu 或 Mail 跟进 |
+| 收藏文章 | 用户收藏文章 | 生成阅读、总结、调研或响应跟进草稿 |
+| 添加书签 | 用户保存链接/书签 | 作为保存链接后的跟进，不分析全量浏览历史 |
+| 分享内容 | 用户通过系统分享入口发送给 Smart Shadow | 提取目标、背景、链接和期望动作，等待确认 |
+| 项目文件夹 | 用户在已映射 Project 文件夹下创建或修改文件 | 生成隐式事项候选、补全上下文、询问是否需要跟进 |
+| Calendar | 用户创建或调整日程 | 生成时间语义候选，可建议补充地点、材料、提醒或关联 Project |
+| 微信文件传输助手 | 用户向文件传输助手发送文本、文件或链接 | 作为个人输入候选，先整理并等待确认，不自动对外发送 |
+| Feishu | 用户发送、标记、分配或在规则范围内暴露事项 | 作为工作 Project 候选，可落在 Feishu 管理，但高风险写入需授权 |
+| GitHub | 用户创建 issue/comment 或明确 `@shadow` | 由 shadowd 接收并进入执行闭环 |
+| 系统建议 | 系统生成待处理建议后用户确认 | 才能进入 follow-up pipeline |
+
+每个输入至少记录：
+
+| 字段 | 定义 |
+|---|---|
+| origin.user_action | 用户触发输入的明确动作，可为空 |
+| origin.intent_mode | `explicit` 或 `implicit_candidate` |
+| source | 来源适配器，如 voice、mail_marked、bookmark_saved、share_extension、github_comment |
+| captured_at | 捕捉时间 |
+| payload | 被用户选择或确认的内容 |
+| requires_confirmation | 是否需要投递前确认 |
+| user_approved | 用户是否已经确认 |
+| follow_up_task_id | 后续任务 ID，可为空 |
+
+只有存在明确 `origin.user_action`，或 `user_approved=true` 的输入，才能进入执行型 follow-up pipeline。`implicit_candidate` 可以进入记录、解释、补全、dry-run、建议或审核流程，但不能触发提醒、归档、删除、回复、转发、对外承诺或共享系统写入，除非规则明确允许且风险等级满足自动执行边界。
+
+### F8. 目标软件响应与同步
+
+用户确认后的 Project / Issue 应由 `shadowd` 连接到 Codex，由 Codex 判断需要更新哪些目标软件。Reminders、Calendar、Finder、Notes、Contacts、Photos、Music、GitHub、Feishu、Mail、微信等都是可选入口、上下文、执行、协作或反馈表面，而不是统一强制的核心管理本体。
+
+Feishu 是当前工作任务默认跟踪面：工作相关 Project / Issue 默认通过 Feishu CLI 落到 Feishu 任务看板，除非该事项本质上是代码、PR、CI、开源反馈或 repo-centered execution。Reminders 是当前生活任务默认跟踪面：生活相关 Project / Issue 默认落到 Reminders 的对应看板或列表。Calendar 只承载会议、预约、时间块、截止点、里程碑和节奏。Finder 承载项目文件和工作产物，Notes 承载轻量知识和资料入口，Contacts / Photos / Music 承载对应的人和媒体资料。所有目标软件都必须保留 Project / Issue 内部身份和映射。
+
+开发型任务、开源反馈、代码 review 或外部协作任务，可以创建或更新 GitHub Issue / Comment / PR 作为外部投影记录。GitHub Issue 不是 Smart Shadow 的核心管理本体。
 
 Issue / Comment 只承载用户确认后的最终文本任务和紧凑来源元数据，不承载原始音频、音频路径、临时录音仓库或未整理的长原始转写。
 
@@ -179,26 +244,27 @@ Issue 中至少包含：
 7. 执行者：shadow。
 8. 当前状态 label。
 
-### F9. shadowd 本地任务承接
+### F9. shadowd 系统服务承接
 
-shadowd 是本地服务。
+shadowd 是本地系统服务，是感知、连接和反馈的媒介、中介、桥梁。
 
 它负责：
 
-1. 接收 GitHub webhook。
-2. 识别由 Smart Shadow 创建或补充的 issue/comment。
-3. 判断任务类型。
-4. 选择合适的本地项目目录。
-5. 分配给 Codex agent。
-6. 记录执行状态。
-7. 以 Shadow bot 身份回写进展到 GitHub。
-8. 将状态同步回 App。
+1. 接收手机轻应用、GitHub webhook、Feishu、Mail、微信、Finder、Calendar 等入口中的显式任务。
+2. 在授权范围内轮询或监测本机应用，生成隐式意图候选。
+3. 保留来源、时间、置信度、去重键、上下文和风险线索。
+4. 识别由 Smart Shadow 创建或接入的 Project / Issue。
+5. 将任务送入 `smart-shadow` 项目的 dispatcher/intake thread，并连接 Codex 完成分解和规划。
+6. 通过复用的 Codex App Server 打开、恢复或创建目标项目下的合适 thread。
+7. 让 Codex 在目标项目 thread 中调用目标软件或本地 Codex agent 执行允许的动作。
+8. 记录执行状态、审计日志、映射关系和反馈。
+9. 以 Shadow bot 身份或对应授权身份创建用户反馈；反馈位置默认使用用户发布任务的平台渠道，也可以按规则同步到 GitHub、Feishu、Mail、App 或本机软件表面。
 
-### F10. Codex agent 分配
+### F10. Codex 决策与 agent 执行
 
-Codex agent 是实际执行者。
+Codex 是决策大脑，Codex agent 是实际执行者之一。
 
-MVP 阶段，用户不直接管理多个 agent。shadowd 根据任务所属 repo、任务类型和当前执行状态，将任务交给合适的本地 Codex agent。
+MVP 阶段，用户不直接管理多个 agent。`shadowd` 根据入口来源、任务所属 repo、任务类型、当前执行状态和 Codex dispatcher 路由结果，打开、恢复或创建目标项目的 Codex thread。Codex 应在该项目 thread 中调用合适的本地 Codex agent 或本机应用动作推进任务；`smart-shadow` dispatcher thread 只负责 intake、解析和分发，除非任务只是低风险直接回复。
 
 ### F11. 执行进展回写
 
@@ -463,13 +529,31 @@ MVP 只需要 5 个核心页面。
 9. 系统更新 Issue / PR 状态。
 10. 任务闭环结束。
 
+### Flow G：标记重要邮件后的跟进
+
+1. 用户在 Mail 或自动化审核界面中明确标记某封邮件重要。
+2. 适配器生成带 `origin.user_action=mark_mail_important` 的输入。
+3. Smart Shadow 提取发件人、主题、摘要、风险和建议动作。
+4. App 展示待确认任务卡，不自动回复、转发、归档或承诺。
+5. 用户确认后，Codex / shadowd 创建 Project / Issue，并按需要投影到 GitHub、Reminders、Calendar、Finder、Notes 或 Mail 跟进。
+6. shadowd 只跟进用户确认后的文本任务。
+
+### Flow H：收藏文章 / 添加书签 / 保存链接后的跟进
+
+1. 用户收藏文章、添加书签、保存链接或通过 share sheet 分享到 Smart Shadow。
+2. 适配器记录 `origin.user_action=save_link`、链接、标题、来源和捕捉时间。
+3. Smart Shadow 将内容整理为阅读、总结、调研、购买比较或响应跟进草稿。
+4. 用户确认是否跟进以及希望的产出。
+5. 确认后才创建 Project / Issue，并按需要投影为 GitHub Issue / Comment、本地提醒、阅读资料、笔记或项目文件。
+6. Bookmark 语义只代表用户保存链接后的跟进，不代表全量浏览历史分析。
+
 ## 8. GitHub 工作流规则
 
 ### 8.1 Issue 的角色
 
-Issue 是任务主记录。
+Project / Issue 在 Codex 中是用户可见的核心处理对象。GitHub Issue 是开发、开源反馈、代码 review 或外部协作场景下的投影记录。
 
-所有需要追踪的任务都应该有 Issue 或等价任务记录。开发任务默认创建 Issue。
+所有需要追踪的任务都应该有 Project / Issue 内部身份和投影映射。开发任务默认可以创建 GitHub Issue，但不得因此绕过 Codex 的主线、Project、Issue 处理语义。
 
 ### 8.2 Issue comment 的角色
 
@@ -569,6 +653,24 @@ Agent Run 表示一次具体执行。
 | issue_comment_url | 进展 comment |
 | pr_url | 关联 PR |
 
+### 9.4 ExplicitIntentSignal
+
+ExplicitIntentSignal 是所有非语音入口进入 follow-up pipeline 前的统一输入对象。
+
+字段包括：
+
+| 字段 | 定义 |
+|---|---|
+| source | 来源适配器名称 |
+| origin.user_action | 用户明确动作 |
+| captured_at | 捕捉时间 |
+| payload | 用户选择、保存、标记、分享或确认的内容 |
+| requires_confirmation | 是否需要确认 |
+| user_approved | 用户是否已确认 |
+| follow_up_task_id | 已生成任务 ID |
+
+缺少 `origin.user_action` 且未被用户确认的输入不能触发 follow-up 动作。
+
 ## 10. MVP 成功标准
 
 MVP 成功的判断标准不是功能数量，而是是否形成稳定闭环。
@@ -597,6 +699,6 @@ MVP 成功的判断标准不是功能数量，而是是否形成稳定闭环。
 
 Smart Shadow MVP 的本质是：
 
-一个 iPhone 单按钮任务入口，加上一个统一 agent 身份 shadow，通过本地 shadowd 调度 Codex agent，把用户的语音任务转化为 GitHub Issue / PR / Comment 中可执行、可追踪、可验收的工作闭环。
+一个 iPhone 轻量任务入口，加上一个运行在 Mac 上的 `shadowd` 系统服务和统一 agent 身份 shadow：`shadowd` 感知显式与隐式意图，Codex 按主线、Project、Issue / 事项三层哲学进行分解和规划，并在对应项目下创建或恢复 Thread 调用 Reminders、Calendar、Finder、Notes、GitHub、Feishu、Mail、微信等目标软件推进；最后由 `shadowd` 创建用户反馈，默认回到用户发布任务的平台渠道，形成可执行、可追踪、可验收的工作闭环。
 
-MVP 的核心价值不是替代现有工具，而是把“想到一个任务”到“agent 开始执行并持续回报”的路径压缩到最短。
+MVP 的核心价值不是替代现有工具，也不是接管全量环境信号，而是把“用户在手机或电脑上表达出的意图”到“Codex 完成决策、shadowd 使用电脑软件推进并持续回报”的路径压缩到最短。

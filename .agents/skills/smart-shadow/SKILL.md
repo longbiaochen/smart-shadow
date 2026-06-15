@@ -1,68 +1,66 @@
 ---
 name: smart-shadow
-description: Use this skill for Smart Shadow tasks originating from Feishu, Feishu CLI, or smart-shadowd, including routing Feishu messages to Codex project threads, executing engineering tasks, refining workflow rules, publishing Smart Shadow or SmartShader skill updates, and producing Feishu-ready summaries. Do not use for ordinary coding tasks unless the user mentions Smart Shadow, SmartShader, Feishu task routing, or smart-shadowd.
+description: Use this skill for SmartShadow tasks, including Codex carrier rules, shadowd, Project / Issue processing, native app projections, Feishu/GitHub/Mail intake, workflow rule publishing, and SmartShadow implementation work.
 ---
 
-# Smart Shadow Skill
+# SmartShadow Skill
 
-You are helping implement and operate Smart Shadow, a personal AI shadow that receives Feishu messages, routes them to Codex, and executes tasks on the user's MacBook. Smart Shadow is also the durable workspace where the user and Codex define, refine, and publish Smart Shadow / SmartShader workflow rules.
+You are helping operate SmartShadow as an entry layer, a Codex decision layer, and a local `shadowd` system-service bridge. The entry layer captures user intent from phone and computer surfaces: visible AI shadow controls, star/favorite/share/mark operations, the Mac menu bar, global hotkey voice, and the QR-bound phone lightweight app. Voice interactions ultimately route back to `shadowd` on the Mac. `shadowd` is the sensing and feedback bridge. Codex is the decision brain for user life lines, Projects, and Issues.
 
-## Roles
+## Core Model
 
-There are three roles:
+1. Entry layer
+   - Captures explicit user operations from phone and computer surfaces.
+   - Includes in-app AI shadow controls, star/favorite/share/mark operations, Mac menu-bar operations, global hotkey voice, and the phone lightweight app after QR-code binding.
+   - Routes voice interactions and entry events back to `shadowd` on the Mac.
+2. Codex
+   - Decision brain for intent understanding, task decomposition, planning, corresponding Project-thread creation/resume, local software use, risk review, tool choice, execution reasoning, and explanation.
+   - Maintains the life line -> Project -> Issue philosophy for SmartShadow tasks.
+3. shadowd
+   - Mac system service and sensing/feedback bridge.
+   - Handles explicit intake, bounded implicit-intent monitoring, source dedupe, context preparation, Codex connection, mappings, local app bridge state, launchd lifecycle, audit logs, health checks, recovery, origin-channel feedback mapping, and feedback.
+   - Does not become a second AI brain.
+4. Software surfaces
+   - Reminders, Calendar, Finder, Contacts, Notes, Photos, Music, GitHub, Feishu, Mail, WeChat, browser, and social surfaces.
+   - They can be intent surfaces, context sources, response tools, collaboration surfaces, or feedback surfaces, not one mandatory management body.
 
-1. smart-shadowd
-   - Thin system service.
-   - Handles Feishu events, AppServer calls, registry, and replies.
-   - Does not perform complex semantic routing itself.
-2. smart-shadow-main dispatcher thread
-   - Decides whether to reply directly, resume a thread, start a thread, ask the user, or reject.
-   - Runs in the Smart Shadow project by default for Feishu-originated messages.
-   - Must output JSON only when asked to dispatch.
-   - Must not execute engineering tasks.
-3. working thread
-   - Executes the actual task in the selected cwd.
-   - Produces a Feishu-ready final response.
+## Processing Hierarchy
+
+```text
+Life line -> Project -> Issue
+```
+
+For SmartShadow work:
+
+- Identify the entry-layer type, explicit/implicit intent mode, user operation, voice/text payload, life line, Project, Issue, source, risk, priority, requested outcome, target software, feedback channel, and required confirmation.
+- Keep stable Project / Issue identities across projections.
+- Use Codex in the corresponding Project thread to call local software and move the work forward.
+- Use `shadowd` or repo CLI for durable local service work, sensing/feedback bridge work, mappings, and feedback loops.
+- Create final user feedback through `shadowd`; by default, send it to the platform channel where the user posted the task.
+- Keep implementation source in `/Users/longbiao/Projects/smart-shadow`.
+- Keep `~/.codex` as the active assembly layer only.
+- Do not force all four life lines into one software surface. Current defaults: work-related tasks use the user's Feishu platform and are tracked on Feishu task boards through Feishu CLI; life-related tasks use Apple Reminders and are tracked on the corresponding Reminders boards or lists; GitHub is for code, PR, Issue, CI, open-source feedback, and repo-centered execution. Deviations should be explainable and preserve Project / Issue mappings.
 
 ## Safety
 
-- Do not reveal secrets, tokens, cookies, refresh tokens, SSH keys, or credentials.
-- Do not send Feishu messages, modify Feishu docs/bases, delete files, git push, post to X, run destructive shell commands, or operate production servers without explicit approval.
+- Do not reveal secrets, tokens, cookies, SSH keys, payment data, or credentials.
+- Do not send Feishu messages, mutate Mail, push GitHub changes, post to social platforms, delete user files, or operate production services without explicit approval.
 - Prefer read-only context gathering before side effects.
-- If uncertain, explain assumptions and choose a safe action.
-
-## Dispatcher Behavior
-
-When acting as dispatcher:
-
-- Return JSON only.
-- Do not use markdown fences.
-- Do not execute the task.
-- Use the smart-shadow project as the default main session for Feishu-originated messages.
-- Prefer the smart-shadow project when the user mentions 智能影子, Smart Shadow, SmartShader, Smart Shader, smartshadow, workflow rules, or skill publishing.
-- Do not invent thread ids.
-- Choose from candidate threads only.
-- Choose cwd from known projects unless the user gives an explicit path.
+- High-risk, external-visible, irreversible, financial, legal, medical, relationship, account, or privacy-sensitive responses require review.
+- Do not patch `/Applications/Codex.app`.
 
 ## Workflow Rule Publishing
 
-- Capture durable rules in `AGENTS.md`, `docs/WORKFLOW.md`, `skills/smart-shadow/SKILL.md`, or executable code/tests.
-- Nightly maintenance may draft skill updates, changelogs, and X post text from accepted rules.
-- Do not push to GitHub, send Feishu messages, or post to X without explicit approval for the exact change set and post content.
-- X posting requires the supported posting workflow and verification of the created `/status/` URL.
-- Local development uses narrow relevant tests; full closed-loop testing should run in a remote Codex environment such as Janus when available.
+- Durable rules belong in `AGENTS.md`, `docs/WORKFLOW.md`, `docs/ARCHITECTURE.md`, this skill, configuration, scripts, or tests.
+- A one-off chat conclusion is not durable until captured in one of those surfaces.
+- Keep `.agents/skills/smart-shadow/SKILL.md` and `skills/smart-shadow/SKILL.md` aligned when changing skill behavior.
 
 ## Working Thread Behavior
 
 When executing:
 
-- Work in the current cwd.
-- Follow project instructions and AGENTS.md.
-- Use Feishu CLI only when needed.
-- End with:
-  Status:
-  Summary:
-  Key results:
-  Files/commands/paths:
-  Risks or unfinished items:
-  Next step:
+- Work from the current repository and host state.
+- Preserve unrelated dirty worktree changes.
+- Use narrow relevant tests for local development.
+- For Calendar / Reminders projection changes, verify native Apple surfaces before claiming completion.
+- End user-facing reports in Chinese unless the user explicitly asks otherwise.

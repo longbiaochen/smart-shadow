@@ -1,19 +1,25 @@
 # Smart Shadow iOS App
 
-The iOS app is the primary Smart Shadow MVP product surface. It is a
-single-button personal task entry that captures voice, transcribes and polishes
-the text locally, turns natural language into a structured task card, asks the
-user to confirm, submits the final text with the user's GitHub identity, and
-shows task progress through the GitHub
-Issue / Comment / PR lifecycle.
+The iOS app is one Smart Shadow entry-layer surface. It is an iPhone-first
+explicit-intent entry for the broader Mac-service-backed loop: voice is an
+important mobile entry, but Smart Shadow also accepts Mac menu-bar operations,
+global hotkey voice, in-app AI shadow controls, star/favorite/share/mark
+operations, and other configured entry-layer events. The phone lightweight app
+can be invoked after QR-code binding, captures voice or text, transcribes and
+polishes local audio when needed, turns natural language or selected content
+into a structured task card, asks the user to confirm, and routes the final
+intent back to `shadowd` on the Mac.
 
 It does not try to become ChatGPT, GitHub Mobile, a project-management suite, or
-a Feishu workspace. The app owns task intake, confirmation, status visibility,
-follow-up capture, push-notification landing, and completion confirmation.
-ShadowD owns local execution, Codex agent assignment, Shadow bot progress
-comments, PR creation, and repo/project routing. ShadowD does not own recording,
-audio storage, speech transcription, text polish, or user-identity GitHub
-writes.
+a Feishu workspace. It also does not take over Mail, messaging, feeds, browser
+history, contacts, or proactive social replies. The app owns mobile explicit
+task intake, confirmation, status visibility, follow-up capture,
+push-notification landing, and completion confirmation.
+ShadowD owns Mac-side intake routing, Codex connection, state tracking,
+origin-channel feedback mapping, and repo/project routing. Codex executes in
+the corresponding Project thread and uses local software or agents to move work
+forward. ShadowD does not own recording, audio storage, speech transcription,
+text polish, or user-identity GitHub writes.
 
 The product PRD is saved in [PRD.md](PRD.md).
 

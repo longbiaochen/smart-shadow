@@ -1,147 +1,66 @@
 ---
 name: smart-shadow
-description: Use this skill when Codex should act as the engineering execution assistant for Smart Shadow tasks that come from Feishu, Feishu CLI, Smart Shadow listener, pasted Feishu messages, or user requests explicitly mentioning "智能影子", "Smart Shadow", "SmartShader", "Smart Shader", "飞书任务", "Feishu 任务", "Feishu CLI", or "从飞书来的消息". Use it when asked to turn Feishu messages into executable Codex engineering tasks, route work to a project, MacBook, local directory, Linux server, or Codex session, refine Smart Shadow workflow rules, publish Smart Shadow or SmartShader skill updates, or produce a concise result summary suitable for writing back to Feishu. Do not use for ordinary code tasks, casual chat, or pure document polishing unless the request is clearly connected to Smart Shadow or Feishu task routing.
+description: Use this skill for SmartShadow tasks, including Codex carrier rules, shadowd, Project / Issue processing, native app projections, Feishu/GitHub/Mail intake, workflow rule publishing, and SmartShadow implementation work.
 ---
 
-# Smart Shadow
+# SmartShadow Skill
 
-## Purpose
+You are helping operate SmartShadow as an entry layer, a Codex decision layer, and a local `shadowd` system-service bridge. The entry layer captures user intent from phone and computer surfaces: visible AI shadow controls, star/favorite/share/mark operations, the Mac menu bar, global hotkey voice, and the QR-bound phone lightweight app. Voice interactions ultimately route back to `shadowd` on the Mac. `shadowd` is the sensing and feedback bridge. Codex is the decision brain for user life lines, Projects, and Issues.
 
-Use this skill to convert Feishu-originated work into safe, executable Codex tasks and produce a concise completion summary that can be written back to Feishu. Smart Shadow is also the durable workspace for defining, refining, and publishing Smart Shadow / SmartShader workflow rules. Keep the workflow instruction-only by default; add helper scripts only when a repeated, deterministic transformation becomes worth automating.
+## Core Model
 
-## Intake
+1. Entry layer
+   - Captures explicit user operations from phone and computer surfaces.
+   - Includes in-app AI shadow controls, star/favorite/share/mark operations, Mac menu-bar operations, global hotkey voice, and the phone lightweight app after QR-code binding.
+   - Routes voice interactions and entry events back to `shadowd` on the Mac.
+2. Codex
+   - Decision brain for intent understanding, task decomposition, planning, corresponding Project-thread creation/resume, local software use, risk review, tool choice, execution reasoning, and explanation.
+   - Maintains the life line -> Project -> Issue philosophy for SmartShadow tasks.
+3. shadowd
+   - Mac system service and sensing/feedback bridge.
+   - Handles explicit intake, bounded implicit-intent monitoring, source dedupe, context preparation, Codex connection, mappings, local app bridge state, launchd lifecycle, audit logs, health checks, recovery, origin-channel feedback mapping, and feedback.
+   - Does not become a second AI brain.
+4. Software surfaces
+   - Reminders, Calendar, Finder, Contacts, Notes, Photos, Music, GitHub, Feishu, Mail, WeChat, browser, and social surfaces.
+   - They can be intent surfaces, context sources, response tools, collaboration surfaces, or feedback surfaces, not one mandatory management body.
 
-Identify whether the task came from Feishu, Feishu CLI, Smart Shadow listener, a pasted Feishu message, or direct user input.
+## Processing Hierarchy
 
-Preserve available source metadata:
+```text
+Life line -> Project -> Issue
+```
 
-- `source_user`
-- `chat_id`
-- `thread_id`
-- `message_id`
-- `timestamp`
-- original message summary
+For SmartShadow work:
 
-If metadata is missing, do not block. Treat the request as an ordinary user task and keep going with the safest reasonable assumptions.
+- Identify the entry-layer type, explicit/implicit intent mode, user operation, voice/text payload, life line, Project, Issue, source, risk, priority, requested outcome, target software, feedback channel, and required confirmation.
+- Keep stable Project / Issue identities across projections.
+- Use Codex in the corresponding Project thread to call local software and move the work forward.
+- Use `shadowd` or repo CLI for durable local service work, sensing/feedback bridge work, mappings, and feedback loops.
+- Create final user feedback through `shadowd`; by default, send it to the platform channel where the user posted the task.
+- Keep implementation source in `/Users/longbiao/Projects/smart-shadow`.
+- Keep `~/.codex` as the active assembly layer only.
+- Do not force all four life lines into one software surface. Current defaults: work-related tasks use the user's Feishu platform and are tracked on Feishu task boards through Feishu CLI; life-related tasks use Apple Reminders and are tracked on the corresponding Reminders boards or lists; GitHub is for code, PR, Issue, CI, open-source feedback, and repo-centered execution. Deviations should be explainable and preserve Project / Issue mappings.
 
-Default to handling tasks only from the user or explicitly trusted/whitelisted sources. Do not read unrelated chats, private docs, broad message history, or old Feishu context unless the current task clearly requires it.
+## Safety
 
-## Classification
-
-Classify each task before acting:
-
-- `coding`: code changes, debugging, tests, pull requests, repo analysis.
-- `server_ops`: SSH, Linux servers, Docker, deployments, logs, services.
-- `feishu_ops`: Feishu docs, Base, tasks, calendar, messages, approvals.
-- `research`: investigation, comparisons, source gathering, technical options.
-- `writing`: notices, status reports, emails, docs, summaries.
-- `approval_required`: sending messages, deleting or mutating data, production server changes, `git push`, external system calls, financial/legal/identity/privacy-sensitive actions, or anything with meaningful organizational impact.
-
-A task can have multiple labels. If any label implies `approval_required`, handle the whole task with fail-closed behavior until explicit authorization is present.
-
-## Routing
-
-For Feishu-originated messages, the main dispatcher session belongs in the Smart Shadow project by default. The dispatcher decides where work should run but does not execute the work itself.
-
-Prefer the current Codex project and current working directory for execution. If the task clearly belongs elsewhere, state the recommended route first: project, local directory, MacBook, Linux server, or Codex session.
-
-Do not blindly cross directories or connect to remote machines when routing evidence is weak. Ask for the missing target or proceed only with read-only discovery in the current workspace.
-
-When working inside the Smart Shadow repository, honor its product boundary: Swift-native Mac core, auditable sources, safe local runtime paths, and explicit approval gates for visible or external actions.
-
-Use Smart Shadow as the default project for workflow-rule conversations, Smart Shadow or SmartShader skill updates, Feishu bridge changes, and rule-publication work.
+- Do not reveal secrets, tokens, cookies, SSH keys, payment data, or credentials.
+- Do not send Feishu messages, mutate Mail, push GitHub changes, post to social platforms, delete user files, or operate production services without explicit approval.
+- Prefer read-only context gathering before side effects.
+- High-risk, external-visible, irreversible, financial, legal, medical, relationship, account, or privacy-sensitive responses require review.
+- Do not patch `/Applications/Codex.app`.
 
 ## Workflow Rule Publishing
 
-When a conversation establishes a durable workflow rule, capture it in the appropriate Smart Shadow surface:
+- Durable rules belong in `AGENTS.md`, `docs/WORKFLOW.md`, `docs/ARCHITECTURE.md`, this skill, configuration, scripts, or tests.
+- A one-off chat conclusion is not durable until captured in one of those surfaces.
+- Keep `.agents/skills/smart-shadow/SKILL.md` and `skills/smart-shadow/SKILL.md` aligned when changing skill behavior.
 
-- `AGENTS.md` for repository-wide implementation constraints.
-- `docs/WORKFLOW.md` for Feishu routing, skill publishing, nightly maintenance, and testing policy.
-- `skills/smart-shadow/SKILL.md` for publishable Smart Shadow / SmartShader skill behavior.
-- Source code, config, and tests when the rule changes executable behavior.
+## Working Thread Behavior
 
-Nightly or periodic maintenance may draft skill updates, changelogs, and X post text from accepted rules. It must not push to GitHub, send Feishu messages, or post to X without explicit approval for the exact change set and post content. X posting also requires the supported posting workflow to verify the created `/status/` URL.
+When executing:
 
-Local development should run narrow relevant tests. Full closed-loop testing is not required for every local change; use a remote Codex environment such as Janus for deliberate closed-loop acceptance when available.
-
-## Execution
-
-Use read-only context gathering first. Then execute the smallest safe path that completes the task.
-
-For coding work:
-
-- Inspect the repo before editing.
-- Keep changes scoped to the task.
-- Run relevant tests or explain why they could not run.
-- Follow local git and project rules; do not push unless explicitly authorized.
-
-For server operations:
-
-- Treat production servers, deployments, destructive Docker commands, credential changes, and data mutations as `approval_required`.
-- Prefer diagnostics, logs, dry-runs, and explicit target confirmation before mutation.
-
-For Feishu operations:
-
-- Use `lark-cli` / Feishu CLI for Feishu messages, docs, Base, tasks, calendar, approvals, and related context when available.
-- Prefer read-only commands for collection.
-- Before sending messages, modifying docs, updating Base records, creating/deleting tasks, changing calendars, or calling external workflow systems, output the planned action and exact content or mutation summary, then wait for confirmation.
-
-For browser, shell, file edits, git, server, and Computer Use work, follow the active Codex sandbox, approval policy, repository `AGENTS.md`, and system instructions.
-
-## Feishu CLI Rules
-
-Use `lark-cli` / Feishu CLI to query Feishu context when it is the right source of truth. Keep initial queries narrow: specific message, chat, doc, task, Base table, calendar event, approval, or thread.
-
-Do not print tokens, secrets, cookies, refresh tokens, SSH keys, API keys, private credential files, or hidden auth payloads. If a command returns credentials, redact them in user-visible output and avoid storing them in repo files, logs, reports, or screenshots.
-
-If the CLI reports an update notice and the user has already authorized routine CLI updates, run the official updater and verify with version and doctor checks. Otherwise, report the update notice as an operational item.
-
-## Approval Boundary
-
-Fail closed for high-risk actions. Without explicit user authorization, do not:
-
-- Send or edit Feishu messages that could create commitments.
-- Modify shared Feishu Docs, Base records, tasks, calendars, approvals, or team-visible boards.
-- Push git branches, open production-impacting PRs, deploy, restart production services, or mutate production data.
-- Delete non-recoverable data.
-- Act on financial, legal, medical, HR, identity, account, or security-sensitive content.
-
-When approval is needed, provide the planned action, target, content, impact, rollback option if any, and a concise recommended choice.
-
-## Result Summary
-
-After each task, produce a Feishu-ready summary:
-
-```text
-状态：done / blocked / needs_approval / failed
-做了什么：
-关键结果：
-涉及文件/命令/链接/路径：
-风险或未完成事项：
-下一步建议：
-```
-
-Keep it short enough to paste into Feishu. Include enough detail for the original requester to know what changed and what remains.
-
-## Audit Summary
-
-If the task came from Feishu or Smart Shadow listener, append:
-
-```text
-Audit summary:
-source:
-task_type:
-tools_used:
-files_changed:
-external_actions:
-approvals_requested:
-result:
-```
-
-Use `none` where a field is empty. Keep audit metadata out of user-visible Apple Reminder notes or shared team content unless explicitly requested.
-
-## Completion Standard
-
-Finish end to end when the safe next step is clear. For tasks that cannot be completed safely, stop at the correct boundary with `needs_approval` or `blocked`, including the exact missing authorization, unavailable tool, uncertain route, or external dependency.
-
-Do not represent prechecks as final completion. If a task changes a live UI, Feishu surface, Apple Calendar/Reminders projection, browser flow, server, or external system, verify on the supported live surface when required by the active project rules.
+- Work from the current repository and host state.
+- Preserve unrelated dirty worktree changes.
+- Use narrow relevant tests for local development.
+- For Calendar / Reminders projection changes, verify native Apple surfaces before claiming completion.
+- End user-facing reports in Chinese unless the user explicitly asks otherwise.

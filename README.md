@@ -1,69 +1,60 @@
 # Smart Shadow
 
-Smart Shadow is an iPhone-first personal task entry app backed by a local `shadowd` execution loop. The core experience is a single voice button: the user speaks a task, the app transcribes and polishes it locally, the user confirms the final text, and the unified agent identity `shadow` drives the work through GitHub Issue / PR / Comment records.
+Smart Shadow is an iPhone-first, Mac-service-backed personal shadow system backed by Codex and a local `shadowd` service on the user's Mac. It has an entry layer across phone and computer surfaces: in-app AI shadow controls, star/favorite/share/mark operations, the Mac menu-bar app, global hotkey voice, and a phone lightweight app that can be invoked after QR-code binding. Voice interactions eventually route back to `shadowd` on the Mac. `shadowd` is the always-on sensing and feedback bridge; Codex is the decision brain that creates or resumes the right Project thread, uses local software to move the work forward, and keeps life lines, Projects, and Issues coherent.
 
-The product is not a chat app, a replacement for GitHub, or a full project-management suite. It shortens the path from "I thought of a task" to "an agent has started, is reporting progress, and can be reviewed."
+The product is not a chat app, a replacement for GitHub, a full project-management suite, or a proactive social agent. It keeps the user in charge of Mail, messaging, news, feeds, files, calendar, and external content, then shortens the path from "I expressed or revealed this intent" to "Codex is working in the corresponding Project thread, local software is being used, and `shadowd` has reported back to the channel where the task was posted."
 
-The current repository also contains the local Swift-native Mac capabilities that make the loop auditable: `shadowd`, CLI controls, launchd lifecycle support, GitHub issue handling, EventKit projections, local logs, and source/rule diagnostics. Runtime state, audit logs, reports, and personal source data stay under ignored local paths. The public repository contains the app, daemon, rules, examples, and documentation.
+At the implementation level, Smart Shadow is Codex productization plus a Swift-native Mac system service: Agent rules, memory, skills, scripts, automation boundaries, and `shadowd` make Codex fit the user's personal operating style while using the software already on the computer.
 
-The source PRD is saved in [docs/PRD.md](docs/PRD.md).
+The four life lines are a design philosophy, not a mandate that every life area must live inside one app. The current defaults are practical: work-related Projects and Issues are tracked on Feishu task boards through Feishu CLI; personal and life-related responses are tracked on the corresponding Apple Reminders boards or lists. GitHub remains the code/PR/Issue/CI and repo-centered execution surface, while Calendar carries time blocks and Finder/Notes/Contacts/Photos/Music carry supporting assets.
+
+The current repository also contains the local Swift-native Mac capabilities that make the loop auditable: `shadowd`, CLI controls, launchd lifecycle support, GitHub issue handling, EventKit projections, local logs, and explicit-intent source/rule diagnostics. Runtime state, audit logs, reports, and personal source data stay under ignored local paths. The public repository contains the app, daemon, rules, examples, and documentation.
+
+The source PRD is saved in [docs/PRD.md](docs/PRD.md). The current processing
+model is documented in [docs/SPACE_TIME_MATRIX.md](docs/SPACE_TIME_MATRIX.md).
+The local Codex carrier assembly is documented in
+[docs/CODEX_CARRIER.md](docs/CODEX_CARRIER.md).
 
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph L0["Layer 0: iPhone task entry"]
-        IOS["SmartShadowIOS"]
-        Voice["single voice button"]
-        LocalVoice["local ChatType ASR/polish"]
-        Confirm["task confirmation"]
+flowchart LR
+    subgraph Entry["Entry layer"]
+        Phone["Phone lightweight app / QR binding"]
+        Menu["Mac menu bar / hotkey voice"]
+        AppResponses["AI shadow / star / favorite / share / mark"]
+        MacApps["Mac apps: Finder / Calendar / Mail / WeChat / Feishu"]
+        External["GitHub / browser / social / other systems"]
     end
 
-    subgraph L1["Layer 1: GitHub task record"]
-        Issue["GitHub Issue"]
-        Comment["Issue comments"]
-        PR["Pull Request"]
-        Project["Project status"]
+    subgraph Bridge["shadowd system service"]
+        Route["Route voice and entry events to Mac"]
+        Sense["Sense explicit and implicit intent"]
+        Context["Deduplicate and prepare context"]
+        Feedback["Create feedback on origin channel"]
     end
 
-    subgraph L2["Layer 2: local shadowd"]
-        Launchd["launchd service"]
-        D["shadowd"]
-        Route["project/repo routing"]
-        Codex["local Codex agent"]
+    subgraph Brain["Codex decision brain"]
+        Philosophy["life line / Project / Issue"]
+        Thread["create / resume Project thread"]
+        Plan["decompose / plan / decide"]
+        Act["call local software"]
+        Review["risk / confirmation / feedback"]
     end
 
-    subgraph L3["Layer 3: optional local work surfaces"]
-        R["Reminders: review/action"]
-        C["Calendar: time blocks"]
-        CLI["operator CLI/menu"]
+    subgraph Surfaces["Response and feedback surfaces"]
+        Reminders["Reminders"]
+        Calendar["Calendar"]
+        Finder["Finder"]
+        Notes["Notes"]
+        Feishu["Feishu"]
+        GitHub["GitHub"]
+        Mail["Mail"]
+        Other["Other Mac apps"]
     end
 
-    subgraph L4["Layer 4: Local evidence"]
-        DB["SQLite state"]
-        Audit["Audit JSONL"]
-        Reports["Operator reports"]
-        Feedback["Rule feedback ledger"]
-    end
-
-    IOS --> Voice --> LocalVoice --> Confirm -->|user GitHub identity| Issue
-    Issue --> Project
-    Issue --> D
-    Comment --> D
-    D --> Route --> Codex
-    Codex --> Comment
-    Codex --> PR
-    PR --> Issue
-    D --> Project
-    D --> DB
-    D --> Audit
-    D --> Reports
-    D -->|EventKit when needed| R
-    D -->|EventKit when needed| C
-    CLI --> D
-    Launchd --> D
-    Audit --> Reports
-    Feedback --> Reports
+    Entry --> Route --> Sense --> Context --> Philosophy --> Thread --> Plan --> Review --> Act --> Surfaces --> Feedback --> Entry
+    Feedback --> Phone
 ```
 
 ## Quick Start
@@ -73,8 +64,8 @@ Requirements:
 - macOS 14 or newer
 - Swift 6 toolchain
 - EventKit permissions for real Calendar or Reminders writes
-- Contacts permission for Google Contacts sync
-- Google OAuth login for Google Calendar, Tasks, and Contacts sources
+- Contacts permission only when a confirmed task needs Google Contacts projection
+- Google OAuth login only when a confirmed task needs Google Calendar, Tasks, or Contacts context/projection
 
 ```sh
 cp config/smart-shadow.example.json config/smart-shadow.json
@@ -94,19 +85,25 @@ bin/smart-shadow eventkit-request-access all
 
 ## Current Verified Slice
 
-- iOS app target `SmartShadowIOS` for voice-first task entry and GitHub-backed delivery work.
+- Entry-layer surfaces: `SmartShadowIOS` for QR-bound mobile voice/text entry and `smart-shadow-menu` for Mac menu-bar entry.
 - SwiftPM executable: `shadowd`
 - Optional SwiftUI menu-bar executable: `smart-shadow-menu`
 - User-level launchd service support
 - JSON event inbox processing
-- Source acceptance previews before enabling daemon sensing
+- Explicit intent source acceptance previews before enabling source adapters
 - Rule registry validation and rule feedback ledger
 - SQLite state, audit JSONL, and reports under ignored `var/`
-- Apple Reminders review-card creation through EventKit
+- Codex as the decision brain for life lines, Projects, Issues, priority,
+  execution planning, Project-thread creation/resume, review, local software use,
+  and target-surface choice
+- `shadowd` as the local system service for entry routing, sensing, Codex
+  connection, tracking, audit, and origin-channel feedback
+- Reminders as a response/reminder surface
+- Calendar as a time-block, deadline, review, rhythm, and milestone surface
 - Calendar/Reminders projection mapping to avoid unrelated duplicates
-- Source diagnostics through `source-doctor`; Mail.app handling is performed by Codex Automation and submitted back as explicit projection decisions
-- Structured Lark calendar and task sensing through local `lark-cli`, with EventKit projection into Calendar and Reminders
-- Explicit `project-mail-decision` projection for Codex Automation mail decisions, limited to Apple Reminders/Calendar, record-only, and low-risk Mail actions
+- Source diagnostics through `source-doctor`; Mail.app is treated as an issue-oriented external flow surface only for user-marked mail, shared/forwarded mail, confirmed mail decisions, or local debug inputs submitted back as explicit Project/Issue decisions
+- Structured Lark calendar and task adapters through local `lark-cli`, with EventKit projection into Calendar and Reminders when tied to explicit tasks
+- Explicit `project-mail-decision` projection for Codex Automation mail decisions, limited to Apple Reminders/Calendar, record-only, and low-risk Mail responses
 - One-way Google Calendar/Tasks/Contacts sync into local Apple iCloud-backed Calendar, Reminders, and Contacts without macOS Internet Accounts
 - LaunchAgent/runtime diagnostics through `service-status`
 
@@ -137,9 +134,22 @@ bin/smart-shadow stop
 script/build_and_run.sh --verify
 ```
 
-`enable-source` requires a latest `ok` acceptance report unless `--force` is used. EventKit-backed Reminders sensing also requires official Reminders authorization. Mail.app is no longer a daemon source: Codex Automation reads and judges mail, then calls `project-mail-decision` with a structured decision for Smart Shadow to project.
+`accept-source` is now Explicit Intent Source Acceptance: it previews a source adapter without writing SQLite state, creating reminders/calendar events, sending messages, or mutating external apps. `enable-source` requires a latest `ok` acceptance report unless `--force` is used. All source adapters are disabled by default. EventKit-backed Reminders adapters also require official Reminders authorization. Mail.app is not a broad daemon source: Codex Automation or the user marks, shares, forwards, or judges mail, then Smart Shadow treats the selected message/thread as an external Issue candidate that can be mapped to a Project and projected through `project-mail-decision`.
 
-`lark_calendar_events` and `lark_tasks` use the local `lark-cli` in user identity mode. These sensing sources are read-only on the Lark side: calendar events are projected to Apple Calendar, while tasks are projected to Apple Reminders only. Mail decisions never create Lark tasks; work mail is projected to the Apple Reminders `WORK` list and any scheduled time block goes to Apple Calendar through EventKit.
+`lark_calendar_events`, `lark_tasks`, Google sources, Calendar, Tasks, and Contacts are context/projection adapters for explicit tasks. They must not proactively decide what matters, start social interactions, or create external commitments. Mail decisions never create Lark tasks by default; confirmed work mail can become a Project Issue, remain linked to its original Mail thread, and project to the Apple Reminders `WORK` list or Apple Calendar when the payload contains a real response or scheduled time block.
+
+## Explicit Intent Inputs
+
+Smart Shadow accepts follow-up work only from explicit user operations:
+
+- Voice task creation.
+- Important-mail marking or a confirmed `project-mail-decision` payload.
+- Article save, bookmark creation, saved link, or share-sheet submission to Smart Shadow.
+- A direct operation on a specific item, such as "follow up on this".
+- GitHub issue/comment content that explicitly mentions `@shadow`.
+- A system-generated suggestion after the user confirms it.
+
+Every follow-up input should carry `origin.user_action`, `source`, `captured_at`, `payload`, `requires_confirmation`, `user_approved`, and `follow_up_task_id` when available. Inputs without a clear `origin.user_action` or `user_approved=true` may be recorded or previewed for debugging, but they cannot trigger follow-up responses such as review reminders, archive/delete/reply/forward operations, or social outreach.
 
 ## macOS Companion Voice Entry
 
@@ -182,12 +192,13 @@ directly for the older status panel while it remains in the package.
 
 ## shadowd GitHub Task Loop
 
-`shadowd` is the Swift-native local service behind the Smart Shadow MVP. It runs
-on the SOL MacBook, treats GitHub Issue / Project / PR state as the durable
-source of truth, assigns work to local Codex agents, and writes progress back as
-Issue comments. It does not maintain a separate authoritative task database.
-Local files are limited to logs, dry-run reports, audit JSONL, caches, and other
-non-authoritative runtime evidence.
+`shadowd` is the Swift-native local service behind Smart Shadow's repo-centered
+execution loop. It runs on the SOL MacBook, uses GitHub Issue / Project / PR
+state as an external development and collaboration record, assigns work to local
+Codex agents, and writes progress back as Issue comments when a Project / Issue
+has a GitHub projection. It does not maintain a separate authoritative task
+database. Local files are limited to logs, dry-run reports, audit JSONL, caches,
+and other non-authoritative runtime evidence.
 
 Terminology:
 
@@ -258,102 +269,74 @@ The Swift `shadowd` implementation normalizes the issue into an internal task, c
 
 See [docs/github-issue-workflow.md](docs/github-issue-workflow.md) for webhook events, repo mapping, environment variables, safety limits, and local test commands. The project name remains `smart-shadow`; the GitHub agent is `shadow`; the local daemon is `shadowd`.
 
-## Legacy Feishu Bridge
+## Feishu Bridge
 
-The older TypeScript Feishu-to-Codex bridge remains in the repository as a transition path, but `bin/shadowd` no longer starts it and it no longer owns GitHub issue execution. `shadowd run` and `shadowd github-issue` are Swift-native paths.
+Feishu/Lark routing is part of the Swift-native `shadowd` command surface. The old local experiment has been folded into `bin/shadowd` and [Sources/SmartShadowMacCore](Sources/SmartShadowMacCore/main.swift); there is no supported Python daemon path.
 
-The legacy bridge does not replace the Swift-native macOS core and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
+The bridge does not replace the GitHub issue workflow and it does not project mail-derived work into shared Feishu task boards. Its job is limited to:
 
 ```mermaid
 flowchart LR
-    Feishu["Feishu CLI event consume"] --> D["shadowd"]
-    D --> AppServer["Codex AppServer stdio"]
-    AppServer --> Main["Smart Shadow: shadowd-router dispatcher thread"]
-    Main --> Work["target Codex working thread"]
+    Feishu["Feishu CLI poll or mock input"] --> D["bin/shadowd"]
+    D --> Router["Swift keyword and risk router"]
+    Router --> Confirm["plan_then_confirm"]
+    Router --> Codex["codex exec in target project"]
+    Codex --> Work["target Codex working thread"]
     Work --> D
     D --> Reply["Feishu reply or dry-run output"]
 ```
 
-Install Node dependencies:
+Configure the bridge in [config/smart-shadow.example.json](config/smart-shadow.example.json) under `feishu_bridge`. The default routing behavior is intentionally conservative:
 
-```sh
-pnpm install
-```
+- Messages matching configured project keywords can run through `codex exec`.
+- The default route is `plan_then_confirm`.
+- High-risk keywords such as production, deletion, database, payment, token, cookie, contract, and investment force confirmation before execution.
+- Session bindings and Codex logs are written under ignored `var/` paths.
 
 Feishu CLI prerequisites:
 
 - `lark-cli` is installed and authenticated.
-- The bot or user identity can consume `im.message.receive_v1`.
-- For first local runs, keep `feishu.dryRunReply: true` in [config/smart-shadow.yaml](config/smart-shadow.yaml).
+- The bot identity can read messages in the configured chat for `feishu-once`.
+- For first local runs, keep `feishu_bridge.feishu.dry_run_reply: true`.
 
-Codex AppServer prerequisites:
-
-- `codex app-server --stdio` is available on `PATH`.
-- The bridge initializes it with `experimentalApi: true`.
-- The current AppServer method shapes should be verified against the local Codex version; a formal implementation should regenerate types from the Codex app-server schema instead of relying on the MVP wrapper.
-
-Configuration lives in [config/smart-shadow.yaml](config/smart-shadow.yaml). Override the path with:
+Probe local CLI capability:
 
 ```sh
-SMART_SHADOW_CONFIG=/absolute/path/to/smart-shadow.yaml pnpm dev:shadowd
+bin/shadowd feishu-probe
 ```
 
-The registry defaults to `.smart-shadow/registry.json` and is created automatically. It stores the Smart Shadow dispatcher thread id, known projects, Feishu-to-Codex thread bindings, and processed message ids.
-
-Feishu-originated main sessions are created in the Smart Shadow project by default. The dispatcher prompt intentionally does not include the full project or session inventory. Routing uses the compact Feishu message plus any existing binding, while project/session inventory is resolved through Codex/AppServer or daemon-side validation before execution.
-
-Workflow-rule refinement, Smart Shadow / SmartShader skill publishing, nightly maintenance, approval boundaries, and closed-loop testing policy are specified in [docs/WORKFLOW.md](docs/WORKFLOW.md).
-
-Run development mode with one event and a timeout:
+Run the old mock-loop behavior through Swift:
 
 ```sh
-pnpm dev:shadowd -- --max-events=1 --timeout=30s
+bin/shadowd feishu-mock --message "devops 只回复一句 shadowd Swift bridge 收到，不修改文件"
 ```
 
-Use the TypeScript development commands directly for foreground legacy bridge testing.
-
-Dry-run replies print the exact outgoing message instead of sending it:
+Poll one configured chat message and reply through `lark-cli`, or dry-run the reply when configured:
 
 ```sh
-[dry-run feishu reply] chat=oc_xxx thread=omt_xxx message=om_xxx
-...
+bin/shadowd feishu-once
 ```
 
-Test dispatcher and local bridge logic:
+The GitHub automation path remains separate:
 
 ```sh
-pnpm demo:shadowd
-pnpm test:shadowd
-pnpm typecheck:shadowd
+bin/shadowd once --dry-run
+bin/shadowd github-issue --payload payload.json --event issues --dry-run
 ```
 
-Test Feishu event consume directly before full-loop testing:
+TypeScript code under [src](src) is retained only for historical/reference tests while the Swift daemon absorbs useful behavior. Do not use it as the production bridge, and do not add new Python daemon code.
+
+Test Feishu CLI access directly before live chat testing:
 
 ```sh
 lark-cli event consume im.message.receive_v1 --as bot
 ```
 
-Full dry-run loop:
-
-1. Set `feishu.dryRunReply: true`.
-2. Run `pnpm dev:shadowd -- --max-events=1 --timeout=30s`.
-3. Send `Smart Shadow 测试：请回复你收到了。`.
-4. Confirm logs show normalization, dispatcher decision, and dry-run reply output.
-
 Current limitations:
 
-- Live Feishu sending is wrapped behind `FeishuReplier`, but the exact `lark-cli im send` command still needs confirmation with this Mac's current `lark-cli im --help`.
-- No SQLite, launchd installer, web UI, approval broker, multi-user administration, or complex stream reducer is included in this MVP.
-- Server-initiated AppServer requests are recognized and declined so they do not crash the bridge.
-- `turn/completed` notification shapes may drift with Codex versions; verify against local AppServer events before running unattended.
-
-Roadmap:
-
-- Generate AppServer TypeScript types from the installed Codex version.
-- Add a fixture-driven AppServer simulator for end-to-end tests.
-- Confirm and harden the live Feishu reply command.
-- Add the nightly skill-maintenance launchd timer only after the dry-run extraction, verification, approval, GitHub push, and X-post draft workflow is proven stable.
-- Promote useful dispatcher examples into [.agents/skills/smart-shadow/SKILL.md](.agents/skills/smart-shadow/SKILL.md).
+- `feishu-once` polls a configured chat; it is not a second long-running daemon story.
+- The supported long-running daemon is still `bin/shadowd run` for the GitHub Project reconciler.
+- Codex execution uses the local `codex exec` CLI path, matching the GitHub issue workflow.
 
 ## Documentation
 

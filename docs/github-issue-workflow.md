@@ -1,9 +1,10 @@
 # GitHub Issue Workflow
 
 In the Smart Shadow MVP, GitHub is the durable task record. The iPhone app turns
-confirmed user intent into a tracked task, `shadowd` executes locally through
-Codex agents, Issue comments carry progress, and Pull Requests carry reviewable
-code changes.
+confirmed user intent into a tracked task, `shadowd` receives and routes the
+task, Codex creates or resumes the corresponding Project thread and uses local
+software or Codex agents to move the work forward, Issue comments carry
+origin-channel feedback, and Pull Requests carry reviewable code changes.
 
 GitHub Issues are therefore not just an input channel for local Codex execution;
 they are the traceable work ledger that lets the app show task state and lets the

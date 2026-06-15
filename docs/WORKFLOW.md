@@ -4,63 +4,147 @@ This document captures durable workflow rules for the Smart Shadow MVP task
 loop, Feishu-originated Codex work, Smart Shadow rule refinement, skill
 publishing, and closed-loop verification.
 
+## ShadowD / Codex Operating Model
+
+Smart Shadow workflows start in an entry layer and are backed by the Mac
+`shadowd` service. The entry layer can be a phone lightweight app, Mac menu-bar
+app, global hotkey voice, in-app AI shadow control, or user operations such as
+star, favorite, share, and mark. Voice interactions eventually route back to
+`shadowd` on the Mac. The default assumption is:
+
+```text
+entry layer event / voice -> shadowd sensing bridge -> Codex Project thread -> local software response -> shadowd origin-channel feedback -> user
+```
+
+Codex owns interpretation, task decomposition, planning, corresponding
+Project-thread creation/resume, local software use, risk review, tool choice,
+execution reasoning, and user-facing explanation. `shadowd` owns durable local
+service duties that a chat session should not hold in memory forever:
+explicit intake, bounded implicit sensing, source dedupe, context preparation,
+Codex connection, mappings, queues, EventKit writes, native app bridges, audit
+logs, health checks, recovery, bridge dispatch, origin-channel mapping, and
+feedback.
+
+Durable rules must be written into `AGENTS.md`, this workflow document, other
+formal docs, skills, configuration, or tests. A one-off chat answer is guidance,
+not a stable Smart Shadow rule, until it is captured in those surfaces.
+
+When the user interacts with Smart Shadow from phone, Mac menu bar, global
+hotkey voice, Feishu, GitHub, Mail, browser, Finder, Calendar, WeChat, or
+another app, the entry layer should preserve the source and route the event back
+to `shadowd`. `shadowd` should preserve context, then connect the task to Codex.
+Codex should apply the same Smart Shadow hierarchy: life line -> Project ->
+Issue. It then chooses the needed software surface: Reminders for responses,
+Calendar for time, Finder for files, Notes for knowledge, Contacts for people,
+Photos/Music for media, and GitHub/Feishu/Mail/WeChat for external
+collaboration or communication records.
+
 ## MVP Task Loop
 
-The PRD-level workflow is iPhone-first:
+The PRD-level workflow is entry-layer-first:
 
-1. The user speaks a task through the iPhone Shadow Button.
-2. The app transcribes, recognizes intent, and creates a structured task card.
+1. The user expresses intent through the entry layer: phone lightweight app,
+   Mac menu bar, global hotkey voice, in-app AI shadow control, star/favorite,
+   share, mark, or another configured operation.
+2. Voice or entry events route back to `shadowd` on the Mac. The relevant entry
+   app transcribes when needed, recognizes intent, and creates a structured task
+   card or intent payload.
 3. The user confirms, edits, cancels, re-records, or adds context.
 4. Confirmed tracked work is submitted to the unified agent identity `shadow`.
-5. GitHub Issue / Comment / PR becomes the durable lifecycle record.
-6. Local `shadowd` maps the task to the right project/repo, assigns a Codex
-   agent, writes progress comments, and creates PRs only for reviewable code
-   changes.
-7. The app shows Draft, Submitted, Queued, Running, Need Input, PR Ready, Done,
+5. Codex is the decision brain for the user's life lines, Projects, and Issues.
+   Reminders, Calendar, GitHub Issue / Comment / PR, Finder, Notes, Contacts,
+   Photos, Music, Feishu, Mail, and WeChat are created or updated only when
+   their software semantics fit the task.
+6. Local `shadowd` maps the task to the right Project/repo, connects Codex to
+   create or resume the corresponding Project thread, and Codex uses local
+   software or a Codex agent to move the work forward.
+7. `shadowd` creates feedback for the user. The default feedback location is the
+   platform channel where the user posted the task. PRs are created only for
+   reviewable code changes.
+8. The app shows Draft, Submitted, Queued, Running, Need Input, PR Ready, Done,
    Failed, or Cancelled state and lands push notifications on the relevant task.
-8. The user confirms completion, requests changes, or creates follow-up work.
+9. The user confirms completion, requests changes, or creates follow-up work.
 
-Feishu remains an auxiliary or legacy coordination channel. It must not redefine
-the MVP product surface as a Feishu workbench.
+Feishu is the user's current default work-task tracking platform. Work-related
+Projects and Issues should be tracked on Feishu task boards through Feishu CLI
+when the task is confirmed and the write boundary is satisfied. Feishu still
+must not redefine Smart Shadow as a complex Feishu workbench; it is the default
+work task surface, while Codex keeps the life line -> Project -> Issue
+philosophy and `shadowd` preserves mappings and feedback channels.
+
+## Explicit And Implicit Intent
+
+Smart Shadow starts from user intent. The entry layer includes explicit phone
+and computer operations: visible AI shadow controls in apps, star/favorite/share
+/mark operations, Mac menu-bar operations, global hotkey voice, and the phone
+lightweight app after QR-code binding. Mac software can also reveal intent.
+`shadowd` may watch configured surfaces for bounded implicit candidates:
+
+- A new file under a mapped Project folder can become a proposed Issue or
+  follow-up.
+- A Calendar item can become a candidate for context completion, materials,
+  reminders, or Project linkage.
+- A WeChat File Transfer Assistant message can become a personal task candidate.
+- User-selected or rule-matched Mail and Feishu items can become Project / Issue
+  candidates.
+
+Implicit candidates default to record, explain, complete context, dry-run, or
+ask for confirmation. They must not automatically create external commitments,
+reply/archive/delete Mail, write shared Feishu tasks, publish social content,
+or mutate user-visible state unless the rule is explicit, low risk, reversible,
+and authorized.
 
 ## Feishu To Codex Routing
 
-Feishu-originated main sessions are created in the Smart Shadow project by default. `shadowd` remains a thin bridge: it consumes Feishu events, starts or resumes the Smart Shadow dispatcher session through Codex AppServer, records routing state, and sends approved replies.
+Feishu-originated work enters through the Swift-native `bin/shadowd` bridge. The
+bridge probes or polls `lark-cli`, records local routing state, and sends the
+task into the Smart Shadow dispatcher context for Codex-based routing.
 
-The Smart Shadow dispatcher session does not execute engineering work. It decides whether to reply directly, resume a bound working thread, start a new working thread, ask for clarification, or reject the request. Actual work may still be dispatched to another Codex project when the message clearly belongs elsewhere.
+The Feishu bridge is not a separate Python, TypeScript, App Server, or model
+daemon. It must reuse the App Server already used by Codex App; it must not start
+or introduce a separate App Server for dispatch. The bridge handles explicit
+intake, high-risk confirmation, app-server request/response handling,
+session/thread mapping, local persistence, and approved replies.
 
 Routing rules:
 
-- Use the Smart Shadow project as the default `mainProjectKey` and dispatcher `cwd`.
-- Resume an existing Feishu-to-Codex binding when the binding clearly still matches the Feishu chat/thread.
-- Start a working thread in another project only when the task text, existing binding, or known project inventory clearly identifies that project.
+- Use the Smart Shadow project as the default intake entry point for `shadowd`
+  tasks. The intake / dispatcher thread parses the task first, then selects the
+  target project and thread for execution.
+- Resume an existing Feishu-to-Codex binding when the configured project mode allows `resume_or_create` and the saved session id still belongs to that project.
+- Start or activate work in another project only after the dispatcher determines
+  that project is relevant and `shadowd` validates the chosen cwd or thread id.
 - Use Smart Shadow for workflow-rule conversations, Smart Shadow or SmartShader skill changes, Feishu bridge changes, and rule-publication work.
 - Ask the user instead of guessing when confidence is below the configured routing threshold.
 
 ## Feishu Execution Layer
 
-For each substantive user task received through Feishu, Smart Shadow should keep the Feishu-side coordination surface separate from the Codex working surface:
+For each substantive user task received through Feishu, Smart Shadow keeps the Feishu-side coordination surface separate from the Codex working surface:
 
-- `shadowd` performs intake, immediate typing indication, task/topic scaffolding, acknowledgement, routing, and final writeback.
-- The Smart Shadow dispatcher thread performs routing only and must not execute the substantive task.
-- The working thread executes the task in the routed project `cwd` and returns a Feishu-ready result.
+- `shadowd` performs intake, dispatcher-thread routing, high-risk confirmation,
+  Codex App Server thread/turn dispatch, local session/thread mapping, and final
+  writeback.
+- The Swift bridge performs only lightweight routing and must not bypass high-risk confirmation.
+- The working thread executes the task in the routed project `cwd` and returns a concise result that can be sent back to Feishu.
 
-Immediate response state is implemented as a `Typing` reaction on the source Feishu message before dispatcher work begins. The reaction is removed after the final reply path finishes or fails.
+The currently supported commands are:
 
-Topic/thread handling:
+- `bin/shadowd feishu-probe` for local `lark-cli` capability checks.
+- `bin/shadowd feishu-mock --message TEXT` for local dry-run and routing verification.
+- `bin/shadowd feishu-once` for one configured chat poll and optional reply.
 
-- Prefer replying with Feishu `reply_in_thread=true` for substantive user tasks, so each source message becomes a separate Feishu thread when the current chat supports threaded replies.
-- When the reply response returns a `thread_id`, save a registry binding for both the original message key and the returned Feishu thread key. This keeps future replies in the same Feishu topic connected to the same Codex working thread.
-- If the incoming event already has a Feishu `thread_id`, treat it as the coordination key and resume the bound Codex thread when appropriate.
-- Current Feishu OpenAPI and `lark-cli` expose creating a thread by replying in thread, forwarding threads, listing thread messages, and switching a group to thread-message mode. They do not expose a supported "rename this individual thread/topic title" API. Do not simulate title changes by editing private Feishu state.
-- If a stable title is required, derive a concise task title before the first acknowledgement and make the source/root message or first bot thread reply carry that title. For ordinary incoming user messages, Smart Shadow can influence the first bot reply but cannot rename the user's original message title through a supported API.
+Thread/topic handling is not a separate daemon feature today. If Feishu thread-specific routing is needed later, it must be added to the Swift bridge and tested there, not revived through a parallel Python or TypeScript runtime.
 
-Feishu task item handling:
+Feishu task item handling follows the work/default-surface rule:
 
-- Create Feishu Tasks only for work/collaboration items where a shared Feishu task is appropriate. Personal, health, finance, relationship, security, or private-life tasks default to Apple Reminders/Calendar or internal Smart Shadow review state unless the user explicitly authorizes a shared Feishu task.
-- For an approved Feishu task, populate `summary`, `description`, `members` with assignee/follower roles, `due` when a deadline can be extracted, `origin.href` or `extra` with source metadata, and optional custom fields for risk/priority when the target tasklist supports them.
-- Use source metadata sparingly: include Feishu `chat_id`, `message_id`, `thread_id`, received time, routed project, and Codex thread id in internal audit or compact task `extra`; do not paste private full message text into shared task descriptions when a concise human summary is enough.
-- Task creation and updates are Feishu write operations. They require an explicit approval boundary unless the user has already authorized the exact class of shared write.
+- Work-related tasks default to Feishu task boards, using Feishu CLI as the
+  supported control path.
+- Personal, health, finance, relationship, security, or private-life tasks
+  default to Codex / internal Smart Shadow review state, with optional updates
+  to Apple Reminders, Calendar, or other private software surfaces when useful.
+- Shared Feishu task creation or update is still an external write operation.
+  It requires the implemented approval boundary, durable mapping, and Swift-side
+  tests before unattended production use.
 
 Coding-task execution policy:
 
@@ -92,11 +176,31 @@ GitHub writeback rules:
 
 GitHub CLI and GitHub MCP are supporting read/write tools. They are not the event bus. Polling may be used only for audit recovery or operations diagnostics; the user-facing GitHub channel path is webhook-first.
 
+## Mail Issue Channel
+
+Mail is a first-class external Issue channel, not merely a reminder source. A single email message or mail thread usually represents one matter; Smart Shadow should treat user-selected mail as an issue-oriented flow item that can be attached to an existing Project or used to create a new Project / Issue.
+
+Mail intake rules:
+
+- Accept mail only after an explicit user operation: flagging, marking, forwarding/sharing to Smart Shadow, selecting it in a review surface, or submitting a confirmed `project-mail-decision` payload.
+- Normalize each accepted message/thread into an external issue candidate with source key, sender, subject, received time, message/thread identifiers, compact summary, requested outcome, risk level, and any deadlines.
+- Resolve Project membership through the Smart Shadow board, explicit user choice, or configured rules. Do not assume the mailbox, sender, or subject alone defines the Project.
+- Keep the original Mail thread as the external communication surface. Smart Shadow owns the internal Issue identity, Project membership, projection mappings, and execution state.
+- User-visible follow-up may project to Reminders, Calendar, Finder project files, Notes knowledge entries, GitHub issues, or Feishu documents according to the Project context.
+
+Mail mutation rules:
+
+- Reading/summarizing selected mail for triage is not the same as permission to mutate Mail.app.
+- Replies, forwards, archives, deletes, mailbox moves, unsubscribe responses, and external commitments require the implemented approval boundary and post-response verification.
+- Do not create Feishu tasks or shared work artifacts from mail unless the user explicitly approves that target surface.
+- Failed or unverifiable Mail mutations must close as explicit zero-response or dry-run reports, not as assumed success.
+
 ### Life OS Project Reconciler
 
-`shadowd` is the Swift-native reconciler for the Life OS GitHub Project. It uses
-GitHub Issue / Project / PR state as the lifecycle source of truth and must not
-store task lifecycle state in a local SQLite table.
+`shadowd` is the Swift-native reconciler for the Life OS GitHub Project when a
+Project / Issue has a repo-centered execution or collaboration projection. It
+uses GitHub Issue / Project / PR state as the external code-collaboration record
+and must not treat local SQLite state as an authoritative user task database.
 
 Minimum commands:
 
@@ -142,6 +246,31 @@ PR policy:
 - Use `Related to #123` for partial PRs.
 - Use `Fixes #123`, `Closes #123`, or `Resolves #123` only when the PR fully satisfies the issue acceptance criteria.
 - Do not use PRs as routine progress logs; use issue comments only at meaningful lifecycle events.
+
+## Cross-App Sync Rule
+
+ShadowD workflows follow the bridge order:
+
+```text
+intent surface -> shadowd sensing/context -> Codex Project thread/response -> shadowd origin-channel feedback
+```
+
+GitHub, Feishu, Mail, browser, ChatGPT, WeChat, Twitter, Xiaohongshu, Zhihu,
+Finder, Calendar, Reminders, Notes, Contacts, Photos, Music, and similar systems
+can be intent surfaces, context sources, response tools, collaboration surfaces,
+or feedback surfaces. Codex is the decision brain and `shadowd` is the sensing
+and response bridge, so workflow implementations must not turn any single native
+app, source adapter, or external system into the canonical task system.
+
+Project and Issue data may be projected to Reminders, Notes, Calendar, Finder, GitHub, Feishu, Contacts, Photos, Music, and other native or external surfaces. These projections must never become separate unmanaged copies of the same work.
+
+Before any workflow updates, completes, moves, deletes, deduplicates, or recreates a projected object, it must resolve the Smart Shadow internal Project/Issue identity and the stored projection mapping for that target surface. If the mapping is missing, ambiguous, stale, or conflicts with user-visible state, the workflow must stop at a dry-run repair plan or explicit user confirmation.
+
+Title, body, date, sender, URL, file path, or asset name matching can help generate a proposed repair, but it is not enough authority for mutation. This rule is a functional safety constraint for every source adapter, native-app projection, external-system sync, and cleanup job.
+
+Long term, user-facing workflows should start in Smart Shadow even when the final surface is an Apple native app. For example, creating a project reminder, opening a project folder, attaching a calendar block, linking a knowledge note, or collecting media assets should go through Smart Shadow commands or UI so the internal identity and projection mapping are created or verified at the same time.
+
+Manual edits made directly in Reminders, Notes, Calendar, Finder, Contacts, Photos, Music, GitHub, or Feishu are valid user input, but they must be treated as external drift until Smart Shadow reconciles them. Sync jobs may report drift, propose repairs, or ask for confirmation; they must not silently reinterpret direct edits as authoritative mapping changes.
 
 ## Workflow Rule Refinement
 
